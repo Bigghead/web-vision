@@ -25,6 +25,10 @@ body {
   width: 100%;
   height: 100%;
   object-fit: cover; /* automatically resize the element, learn smth new every day */
+  transform: scaleX(
+    -1
+  ); /* mirrors the video, otherwise left/right are flipped */
+  -webkit-transform: scaleX(-1);
 }
 
 .webgl {

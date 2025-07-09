@@ -1,5 +1,6 @@
 import * as three from "three";
 import { ThreeCanvas } from "../src/lib/canvas";
+import { MediaPipeHands } from "./lib/media-pipe-hands";
 
 const canvas = document.querySelector("canvas.webgl") as HTMLCanvasElement;
 const webcam = document.querySelector("video.webcam") as HTMLVideoElement;
@@ -33,6 +34,8 @@ const initWebcam = async (): Promise<WebcamResponse> => {
         video: {
           width: { min: width, max: width },
           height: { min: height, max: height },
+          frameRate: 30,
+          facingMode: { exact: "user" }, // centered front facing camera only ( for phone mostly )
         },
       });
       webcam.srcObject = videoCam;
@@ -53,4 +56,14 @@ const initWebcam = async (): Promise<WebcamResponse> => {
   });
 };
 
-initWebcam().then().catch();
+(async () => {
+  try {
+    await initWebcam();
+    const hands = new MediaPipeHands(webcam, width, height, () =>
+      console.log("hands started")
+    );
+    hands.start();
+  } catch (e) {
+    console.error(e);
+  }
+})();
