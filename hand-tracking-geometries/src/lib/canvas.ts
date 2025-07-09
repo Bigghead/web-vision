@@ -45,6 +45,7 @@ export class ThreeCanvas {
 
     this.renderer = new three.WebGLRenderer({
       canvas,
+      alpha: true,
     });
     this.renderer.setSize(this.sizes.width, this.sizes.height);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));

@@ -2,11 +2,16 @@ import * as three from "three";
 import { ThreeCanvas } from "../src/lib/canvas";
 
 const canvas = document.querySelector("canvas.webgl") as HTMLCanvasElement;
+const webcam = document.querySelector("video.webcam") as HTMLVideoElement;
+
 if (!canvas) {
   console.error("Canvas element with class 'webgl' not found.");
 }
 
 const threeCanvas = new ThreeCanvas({ canvas, initShadow: false });
+const {
+  sizes: { width, height },
+} = threeCanvas;
 
 const cube: three.Mesh<three.BoxGeometry, three.MeshBasicMaterial> =
   new three.Mesh(
@@ -15,3 +20,37 @@ const cube: three.Mesh<three.BoxGeometry, three.MeshBasicMaterial> =
   );
 
 threeCanvas.scene.add(cube);
+
+type WebcamResponse = {
+  success: boolean;
+  error?: string | Error;
+};
+
+const initWebcam = async (): Promise<WebcamResponse> => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const videoCam = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { min: width, max: width },
+          height: { min: height, max: height },
+        },
+      });
+      webcam.srcObject = videoCam;
+
+      webcam.onloadedmetadata = () => {
+        webcam.play();
+
+        resolve({
+          success: true,
+        });
+      };
+    } catch (e) {
+      reject({
+        success: false,
+        error: `${e}`,
+      });
+    }
+  });
+};
+
+initWebcam().then().catch();
