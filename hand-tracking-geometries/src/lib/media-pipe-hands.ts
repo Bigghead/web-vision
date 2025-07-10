@@ -5,8 +5,8 @@ export class MediaPipeHands {
   camera;
   constructor(
     videoElement: HTMLVideoElement,
-    width,
-    height,
+    width: number,
+    height: number,
     callbackFunc: unknown
   ) {
     const hands = new Hands({

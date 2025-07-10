@@ -14,14 +14,16 @@ body {
 }
 
 .webcam,
-.webgl {
+.webgl,
+.canvas-2d {
   position: absolute;
   top: 0;
   left: 0;
   outline: none;
 }
 
-.webcam {
+.webcam,
+.canvas-2d {
   width: 100%;
   height: 100%;
   object-fit: cover; /* automatically resize the element, learn smth new every day */
