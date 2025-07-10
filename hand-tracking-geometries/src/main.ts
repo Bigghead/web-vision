@@ -6,6 +6,7 @@ const canvas = document.querySelector("canvas.webgl") as HTMLCanvasElement;
 const webcam = document.querySelector("video.webcam") as HTMLVideoElement;
 const canvas2d = document.querySelector(".canvas-2d") as HTMLCanvasElement;
 const ctx = canvas2d.getContext("2d") as CanvasRenderingContext2D;
+const ctxLineSize = 1;
 
 if (!canvas) {
   console.error("Canvas element with class 'webgl' not found.");
@@ -107,39 +108,51 @@ const drawHand = (...hands: MultiHandLandmark[][]): void => {
     connections.forEach(([i, j]) => {
       const start = hand[i];
       const end = hand[j];
-
-      ctx.lineWidth = 0.5;
-      ctx.beginPath();
-      ctx.moveTo(start.x * canvas2d.width, start.y * canvas2d.height);
-      ctx.lineTo(end.x * canvas2d.width, end.y * canvas2d.height);
-      ctx.strokeStyle = "red";
-      ctx.stroke();
+      createHandLines(start, end);
     });
+
+    splitDigitLandmarks(hand);
   });
 };
 
+const createHandLines = (
+  start: MultiHandLandmark,
+  end: MultiHandLandmark
+): void => {
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(start.x * canvas2d.width, start.y * canvas2d.height);
+  ctx.lineTo(end.x * canvas2d.width, end.y * canvas2d.height);
+  ctx.strokeStyle = "red";
+  ctx.stroke();
+};
+
 const splitDigitLandmarks = (hand: MultiHandLandmark[]): void => {
-  const pointSize = 1;
+  hand.forEach(drawDigitLandmark);
+};
 
-  hand.forEach((landmark, index) => {
-    // Special color for thumb tip (index 4) and index finger tip (index 8)
-    let pointColor = "green";
-    const isTip = index === 4 || index === 8;
-    if (isTip) {
-      pointColor = "blue";
-    }
+const drawDigitLandmark = (
+  landmark: MultiHandLandmark,
+  index: number
+): void => {
+  let pointColor = "green";
+  const isTip = index === 4 || index === 8;
 
-    ctx.fillStyle = pointColor;
-    ctx.beginPath();
-    ctx.arc(
-      landmark.x * canvas2d.width,
-      landmark.y * canvas2d.height,
-      isTip ? pointSize * 1.2 : pointSize,
-      0,
-      2 * Math.PI
-    );
-    ctx.fill();
-  });
+  // different tip color for index finger / thumb ( for pinching visualization / actions later)
+  if (isTip) {
+    pointColor = "blue";
+  }
+
+  ctx.fillStyle = pointColor;
+  ctx.beginPath();
+  ctx.arc(
+    landmark.x * canvas2d.width,
+    landmark.y * canvas2d.height,
+    isTip ? ctxLineSize * 1.2 : ctxLineSize,
+    0,
+    2 * Math.PI
+  );
+  ctx.fill();
 };
 
 (async () => {
@@ -161,7 +174,6 @@ const splitDigitLandmarks = (hand: MultiHandLandmark[]): void => {
           const rightHand = multiHandLandmarks[1];
 
           drawHand(leftHand, rightHand);
-          splitDigitLandmarks(leftHand);
         }
       }
     );
