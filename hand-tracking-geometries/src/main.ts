@@ -105,21 +105,22 @@ const drawHand = (...hands: MultiHandLandmark[][]): void => {
 
   hands.forEach((hand) => {
     if (!hand) return;
+
     connections.forEach(([i, j]) => {
       const start = hand[i];
       const end = hand[j];
-      createHandLines(start, end);
+      drawHandLine(start, end);
     });
 
-    splitDigitLandmarks(hand);
+    drawDigitLandmarks(hand);
   });
 };
 
-const createHandLines = (
+const drawHandLine = (
   start: MultiHandLandmark,
   end: MultiHandLandmark
 ): void => {
-  ctx.lineWidth = 0.5;
+  ctx.lineWidth = ctxLineSize;
   ctx.beginPath();
   ctx.moveTo(start.x * canvas2d.width, start.y * canvas2d.height);
   ctx.lineTo(end.x * canvas2d.width, end.y * canvas2d.height);
@@ -127,11 +128,11 @@ const createHandLines = (
   ctx.stroke();
 };
 
-const splitDigitLandmarks = (hand: MultiHandLandmark[]): void => {
-  hand.forEach(drawDigitLandmark);
+const drawDigitLandmarks = (hand: MultiHandLandmark[]): void => {
+  hand.forEach(drawPointOnFinger);
 };
 
-const drawDigitLandmark = (
+const drawPointOnFinger = (
   landmark: MultiHandLandmark,
   index: number
 ): void => {
@@ -155,6 +156,17 @@ const drawDigitLandmark = (
   ctx.fill();
 };
 
+const drawHandLandmarks = (multiHandLandmarks: MultiHandLandmark[][]): void => {
+  console.log("hands started", multiHandLandmarks);
+  // landmarks are 20 points on your hand, with 0 - 5 being where your palm begins and thumb ends split into 5
+  if (multiHandLandmarks.length) {
+    const leftHand = multiHandLandmarks[0];
+    const rightHand = multiHandLandmarks[1];
+
+    drawHand(leftHand, rightHand);
+  }
+};
+
 (async () => {
   try {
     await initWebcam();
@@ -162,20 +174,8 @@ const drawDigitLandmark = (
       webcam,
       width,
       height,
-      ({
-        multiHandLandmarks,
-      }: {
-        multiHandLandmarks: MultiHandLandmark[][];
-      }) => {
-        console.log("hands started", multiHandLandmarks);
-        // landmarks are 20 points on your hand, with 0 - 5 being where your palm begins and thumb ends split into 5
-        if (multiHandLandmarks.length) {
-          const leftHand = multiHandLandmarks[0];
-          const rightHand = multiHandLandmarks[1];
-
-          drawHand(leftHand, rightHand);
-        }
-      }
+      ({ multiHandLandmarks }: { multiHandLandmarks: MultiHandLandmark[][] }) =>
+        drawHandLandmarks(multiHandLandmarks)
     );
     hands.start();
 
