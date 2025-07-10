@@ -66,24 +66,55 @@ const initWebcam = async (): Promise<WebcamResponse> => {
   });
 };
 
-type HandDigits = {
-  thumb: MultiHandLandmark[];
-  index: MultiHandLandmark[];
-  middle: MultiHandLandmark[];
-  ring: MultiHandLandmark[];
-  little: MultiHandLandmark[];
-};
+const drawHand = (...hands: MultiHandLandmark[][]): void => {
+  ctx.clearRect(0, 0, canvas2d.width, canvas2d.height);
 
-// Each
-const getDigits = (hand: MultiHandLandmark[] | null): HandDigits | null => {
-  if (!hand) return null;
-  return {
-    thumb: hand.slice(0, 5),
-    index: hand.slice(5, 9),
-    middle: hand.slice(9, 13),
-    ring: hand.slice(13, 17),
-    little: hand.slice(17, hand.length),
-  };
+  const connections = [
+    // Thumb
+    [0, 1],
+    [1, 2],
+    [2, 3],
+    [3, 4],
+    // Index finger
+    [0, 5],
+    [5, 6],
+    [6, 7],
+    [7, 8],
+    // Middle finger
+    [0, 9],
+    [9, 10],
+    [10, 11],
+    [11, 12],
+    // Ring finger
+    [0, 13],
+    [13, 14],
+    [14, 15],
+    [15, 16],
+    // Pinky
+    [0, 17],
+    [17, 18],
+    [18, 19],
+    [19, 20],
+    // Palm
+    [0, 5],
+    [5, 9],
+    [9, 13],
+    [13, 17],
+  ];
+
+  hands.forEach((hand) => {
+    if (!hand) return;
+    connections.forEach(([i, j]) => {
+      const start = hand[i];
+      const end = hand[j];
+
+      ctx.beginPath();
+      ctx.moveTo(start.x * canvas2d.width, start.y * canvas2d.height);
+      ctx.lineTo(end.x * canvas2d.width, end.y * canvas2d.height);
+      ctx.strokeStyle = "red";
+      ctx.stroke();
+    });
+  });
 };
 
 (async () => {
@@ -104,34 +135,13 @@ const getDigits = (hand: MultiHandLandmark[] | null): HandDigits | null => {
           const leftHand = multiHandLandmarks[0];
           const rightHand = multiHandLandmarks[1];
 
-          const leftDigits = getDigits(leftHand);
-          const rightDigits = getDigits(rightHand);
-
-          if (leftDigits) {
-            console.log("Canvas element:", canvas2d);
-            console.log(
-              "Canvas width:",
-              canvas2d.width,
-              "height:",
-              canvas2d.height
-            );
-            console.log("2D Context:", ctx);
-            const thumbTip = leftDigits.thumb[0];
-
-            console.log(thumbTip.x, thumbTip.y);
-
-            const pixelX = thumbTip.x * canvas.width;
-            const pixelY = thumbTip.y * canvas.height;
-            ctx.beginPath();
-            ctx.arc(pixelX, pixelY, 5, 0, Math.PI * 2);
-            ctx.fillStyle = "green";
-            ctx.fill();
-            ctx.closePath();
-          }
+          drawHand(leftHand, rightHand);
         }
       }
     );
     hands.start();
+
+    console.log("Drawing static red circle!");
   } catch (e) {
     console.error(e);
   }
