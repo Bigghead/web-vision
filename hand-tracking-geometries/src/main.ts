@@ -108,12 +108,37 @@ const drawHand = (...hands: MultiHandLandmark[][]): void => {
       const start = hand[i];
       const end = hand[j];
 
+      ctx.lineWidth = 0.5;
       ctx.beginPath();
       ctx.moveTo(start.x * canvas2d.width, start.y * canvas2d.height);
       ctx.lineTo(end.x * canvas2d.width, end.y * canvas2d.height);
       ctx.strokeStyle = "red";
       ctx.stroke();
     });
+  });
+};
+
+const splitDigitLandmarks = (hand: MultiHandLandmark[]): void => {
+  const pointSize = 1;
+
+  hand.forEach((landmark, index) => {
+    // Special color for thumb tip (index 4) and index finger tip (index 8)
+    let pointColor = "green";
+    const isTip = index === 4 || index === 8;
+    if (isTip) {
+      pointColor = "blue";
+    }
+
+    ctx.fillStyle = pointColor;
+    ctx.beginPath();
+    ctx.arc(
+      landmark.x * canvas2d.width,
+      landmark.y * canvas2d.height,
+      isTip ? pointSize * 1.2 : pointSize,
+      0,
+      2 * Math.PI
+    );
+    ctx.fill();
   });
 };
 
@@ -136,6 +161,7 @@ const drawHand = (...hands: MultiHandLandmark[][]): void => {
           const rightHand = multiHandLandmarks[1];
 
           drawHand(leftHand, rightHand);
+          splitDigitLandmarks(leftHand);
         }
       }
     );
