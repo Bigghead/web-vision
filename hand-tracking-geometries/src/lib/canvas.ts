@@ -139,4 +139,26 @@ export class ThreeCanvas {
     this.controls.dispose();
     this.renderer.dispose();
   };
+
+  // get the viewable screen for a threejs canvas
+  // used for converting canvas / html cursor or mediapipe coordinates into usable threejs positioning
+  public get3dWorldScreenSize = (): {
+    viewableHeight: number;
+    viewableWidth: number;
+  } => {
+    const { aspect, fov, position } = this.camera;
+    const fovRad = three.MathUtils.degToRad(fov); // Convert camera FOV from degrees to radians
+
+    const cameraToTargetDist = Math.abs(position.z - 0);
+    console.log(position, cameraToTargetDist);
+
+    // Calculate the actual height and width visible in the 3D world
+    const viewableHeight = 2 * Math.tan(fovRad / 2) * cameraToTargetDist;
+    const viewableWidth = viewableHeight * aspect;
+
+    return {
+      viewableHeight,
+      viewableWidth,
+    };
+  };
 }

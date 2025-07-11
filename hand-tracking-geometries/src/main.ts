@@ -29,7 +29,7 @@ const threeCanvas = new ThreeCanvas({ canvas, initShadow: false });
 const {
   sizes: { width, height },
   scene,
-  camera,
+  get3dWorldScreenSize,
 } = threeCanvas;
 
 const cube: three.Mesh<three.BoxGeometry, three.MeshBasicMaterial> =
@@ -176,6 +176,17 @@ const drawHandLandmarks = (multiHandLandmarks: MultiHandLandmark[][]): void => {
     const leftHand = multiHandLandmarks[0];
     const rightHand = multiHandLandmarks[1];
     drawHand(leftHand, rightHand);
+
+    const indexFingerTip = leftHand[4];
+
+    const { viewableHeight, viewableWidth } = get3dWorldScreenSize();
+    console.log(viewableHeight, viewableWidth);
+
+    // --- Convert MediaPipe's (0-1) coordinates to Three.js world coordinates ---
+    const posX = -indexFingerTip.x * viewableWidth;
+    const posY = -indexFingerTip.y * viewableHeight;
+
+    cube.position.set(posX, posY, 0);
   }
 };
 
