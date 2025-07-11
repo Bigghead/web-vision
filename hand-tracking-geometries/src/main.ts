@@ -12,10 +12,24 @@ if (!canvas) {
   console.error("Canvas element with class 'webgl' not found.");
 }
 
+// Fix blurry canvas drawn lines
+(function fix_dpr() {
+  const dpr = window.devicePixelRatio || 1;
+  let style_height = +getComputedStyle(canvas2d)
+    .getPropertyValue("height")
+    .slice(0, -2);
+  let style_width = +getComputedStyle(canvas2d)
+    .getPropertyValue("width")
+    .slice(0, -2);
+  canvas2d.setAttribute("height", (style_height * dpr).toString());
+  canvas2d.setAttribute("width", (style_width * dpr).toString());
+})();
+
 const threeCanvas = new ThreeCanvas({ canvas, initShadow: false });
 const {
   sizes: { width, height },
   scene,
+  camera,
 } = threeCanvas;
 
 const cube: three.Mesh<three.BoxGeometry, three.MeshBasicMaterial> =
@@ -157,12 +171,10 @@ const drawPointOnFinger = (
 };
 
 const drawHandLandmarks = (multiHandLandmarks: MultiHandLandmark[][]): void => {
-  console.log("hands started", multiHandLandmarks);
   // landmarks are 20 points on your hand, with 0 - 5 being where your palm begins and thumb ends split into 5
   if (multiHandLandmarks.length) {
     const leftHand = multiHandLandmarks[0];
     const rightHand = multiHandLandmarks[1];
-
     drawHand(leftHand, rightHand);
   }
 };
