@@ -140,14 +140,26 @@ export class ThreeCanvas {
 		this.renderer.dispose();
 	};
 
-	// Convert a 2d coordinate into usable threejs world coordinates
-	// useful for cursor tracking
-	public getNormalizedDeviceCoords = (x: number, y: number): three.Vector3 => {
+	/**
+	 *
+	 * Convert a 2d coordinate into usable threejs world coordinates
+	 * Useful for cursor tracking
+	 * @returns threejs vector3 coordinates
+	 */
+	public getNormalizedDeviceCoords = ({
+		x,
+		y,
+		mirrored = false,
+	}: {
+		x: number;
+		y: number;
+		mirrored?: boolean;
+	}): three.Vector3 => {
 		// First step is converting the coords to range from -1 - 1 ( [-1, 1 ] )
-		// has subtracted from 1 because the screen / webcam are flipped scaleX on the css ( mirrored )
-
-		const coordX = (1 - x) * 2 - 1;
-		const coordY = (1 - y) * 2 - 1;
+		// Using a flag to see if we should flip x / y ( like for webcam )
+		const flipMirrorFlag = mirrored ? -1 : 1;
+		const coordX = flipMirrorFlag * (x * 2 - 1);
+		const coordY = flipMirrorFlag * (y * 2 - 1);
 		const normalizedCoordinates = new three.Vector3(coordX, coordY, 0.5);
 
 		// this is the magic trick, it turns the above vector3 to a point according to where the camera sees it

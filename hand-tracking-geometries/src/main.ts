@@ -181,7 +181,11 @@ const drawHandLandmarks = (multiHandLandmarks: MultiHandLandmark[][]): void => {
 
 		// Ok, this is kinda intense but the whole gist of it is we need convert a mediapipe coords to usable threejs coords
 		// mediapipe goes from 0 ( left of screen ) to 1 ( right end of screen )
-		const worldPos = getNormalizedDeviceCoords(finger.x, finger.y);
+		const worldPos = getNormalizedDeviceCoords({
+			x: finger.x,
+			y: finger.y,
+			mirrored: true,
+		});
 		cube.position.copy(worldPos);
 	}
 };
