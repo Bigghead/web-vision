@@ -6,23 +6,28 @@ const canvas = document.querySelector("canvas.webgl") as HTMLCanvasElement;
 const webcam = document.querySelector("video.webcam") as HTMLVideoElement;
 const canvas2d = document.querySelector(".canvas-2d") as HTMLCanvasElement;
 const ctx = canvas2d.getContext("2d") as CanvasRenderingContext2D;
-const ctxLineSize = 1;
+const ctxLineSize = 2.5;
 
 if (!canvas) {
 	console.error("Canvas element with class 'webgl' not found.");
 }
 
+const getDimensionsFromElement = (
+	element: HTMLElement,
+	...properties: string[]
+): number[] => {
+	return properties.map((prop) => {
+		const style = getComputedStyle(element).getPropertyValue(prop);
+		// remove "px" from height/width
+		return parseFloat(style.slice(0, -2));
+	});
+};
 // Fix blurry canvas drawn lines
 (function fix_dpr() {
 	const dpr = window.devicePixelRatio || 1;
-	let style_height = +getComputedStyle(canvas2d)
-		.getPropertyValue("height")
-		.slice(0, -2);
-	let style_width = +getComputedStyle(canvas2d)
-		.getPropertyValue("width")
-		.slice(0, -2);
-	canvas2d.setAttribute("height", (style_height * dpr).toString());
-	canvas2d.setAttribute("width", (style_width * dpr).toString());
+	const [height, width] = getDimensionsFromElement(canvas2d, "height", "width");
+	canvas2d.setAttribute("height", (height * dpr).toString());
+	canvas2d.setAttribute("width", (width * dpr).toString());
 })();
 
 const threeCanvas = new ThreeCanvas({ canvas, initShadow: false });
@@ -163,7 +168,7 @@ const drawPointOnFinger = (
 	ctx.arc(
 		landmark.x * canvas2d.width,
 		landmark.y * canvas2d.height,
-		isTip ? ctxLineSize * 1.2 : ctxLineSize,
+		isTip ? ctxLineSize * 2.5 : ctxLineSize,
 		0,
 		2 * Math.PI
 	);
