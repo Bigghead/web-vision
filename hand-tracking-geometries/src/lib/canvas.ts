@@ -1,66 +1,92 @@
 import * as three from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
-/**
- * Base
- */
+type Dimensions = {
+	width: number;
+	height: number;
+};
 
-export class ThreeCanvas {
-	sizes = {
-		width: window.innerWidth,
-		height: window.innerHeight,
-	};
-	cursor = { x: 0, y: 0 };
+class Sizes {
+	width = window.innerWidth;
+	height = window.innerHeight;
 
-	scene = new three.Scene();
-	ambientLight = new three.AmbientLight(0xffffff, 2.1);
-	directionalLight = new three.DirectionalLight("#ffffff", 2);
-	camera = new three.PerspectiveCamera(
-		75,
-		this.sizes.width / this.sizes.height,
-		0.1,
-		100
-	);
-	textureLoader = new three.TextureLoader();
-	clock = new three.Clock();
+	public resize() {
+		this.width = window.innerWidth;
+		this.height = window.innerHeight;
+	}
+}
 
-	directionalLighthelper: three.DirectionalLightHelper | null = null;
-	shadowHelper: three.CameraHelper | null = null;
-	controls: OrbitControls;
-	renderer: three.WebGLRenderer;
-
-	constructor({
-		canvas,
-		initShadow,
-	}: {
-		canvas: HTMLCanvasElement;
-		initShadow: boolean;
-	}) {
-		this.directionalLight.position.set(-10, 10, -10);
-
+class ThreeCamera {
+	camera: three.PerspectiveCamera;
+	sizes: Dimensions;
+	constructor(sizes: Sizes) {
+		this.sizes = sizes;
+		this.camera = new three.PerspectiveCamera(
+			75,
+			this.sizes.width / this.sizes.height,
+			0.1,
+			100
+		);
 		this.camera.position.set(3, 3, 3);
+	}
 
-		this.controls = new OrbitControls(this.camera, canvas);
-		this.controls.enableDamping = true;
+	public resize() {
+		this.camera.aspect = this.sizes.width / this.sizes.height;
+		this.camera.updateProjectionMatrix();
+	}
+}
 
+class ThreeRenderer {
+	renderer: three.WebGLRenderer;
+	sizes: Dimensions;
+
+	constructor(canvas: HTMLCanvasElement, sizes: Sizes) {
 		this.renderer = new three.WebGLRenderer({
 			canvas,
-			alpha: true,
+			// alpha: true,
 		});
+		this.sizes = sizes;
 		this.renderer.setSize(this.sizes.width, this.sizes.height);
 		this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+	}
 
+	public resize() {
+		this.renderer?.setSize(this.sizes.width, this.sizes.height);
+		this.renderer?.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+	}
+}
+
+class ThreeControls {
+	controls: OrbitControls;
+	constructor(camera: three.PerspectiveCamera, canvas: HTMLCanvasElement) {
+		this.controls = new OrbitControls(camera, canvas);
+		this.controls.enableDamping = true;
+	}
+}
+
+class ThreeLighting {
+	ambientLight = new three.AmbientLight(0xffffff, 2.1);
+	directionalLight = new three.DirectionalLight("#ffffff", 2);
+	scene: three.Scene;
+	renderer: three.WebGLRenderer;
+	directionalLighthelper: three.DirectionalLightHelper | null = null;
+	shadowHelper: three.CameraHelper | null = null;
+
+	constructor({
+		scene,
+		renderer,
+		initShadow = false,
+	}: {
+		scene: three.Scene;
+		renderer: three.WebGLRenderer;
+		initShadow?: boolean;
+	}) {
+		this.scene = scene;
+		this.renderer = renderer;
+		this.directionalLight.position.set(-10, 10, -10);
 		if (initShadow) {
 			this.initShadow();
 		}
-		this.scene.add(this.ambientLight, this.directionalLight, this.camera);
-
-		// Add event listeners (important for functionality)
-		window.addEventListener("resize", this.resizeCanvas);
-		window.addEventListener("scroll", this.handleScroll);
-		window.addEventListener("mousemove", this.handleMouseMove);
-
-		this.animationTick();
 	}
 
 	initShadow = (): void => {
@@ -87,22 +113,61 @@ export class ThreeCanvas {
 		this.scene.add(this.directionalLighthelper);
 		this.scene.add(this.shadowHelper);
 	};
+}
+
+export class ThreeCanvas {
+	cursor = { x: 0, y: 0 };
+	sizes: Sizes;
+	threeCamera: ThreeCamera;
+	controls: OrbitControls;
+	threeRenderer: ThreeRenderer;
+	lighting: ThreeLighting;
+
+	scene = new three.Scene();
+	textureLoader = new three.TextureLoader();
+	clock = new three.Clock();
+
+	constructor({
+		canvas,
+		initShadow,
+	}: {
+		canvas: HTMLCanvasElement;
+		initShadow: boolean;
+	}) {
+		this.sizes = new Sizes();
+		this.threeCamera = new ThreeCamera(this.sizes);
+		this.controls = new ThreeControls(this.threeCamera.camera, canvas).controls;
+		this.threeRenderer = new ThreeRenderer(canvas, this.sizes);
+		this.lighting = new ThreeLighting({
+			scene: this.scene,
+			renderer: this.threeRenderer.renderer,
+			initShadow,
+		});
+
+		this.scene.add(
+			this.lighting.ambientLight,
+			this.lighting.directionalLight,
+			this.threeCamera.camera
+		);
+
+		// Add event listeners (important for functionality)
+		window.addEventListener("resize", this.resizeCanvas);
+		window.addEventListener("scroll", this.handleScroll);
+		window.addEventListener("mousemove", this.handleMouseMove);
+
+		this.animationTick();
+	}
 
 	/**
 	 * Event Actions
 	 */
 	public resizeCanvas = (): void => {
 		// Update sizes
-		this.sizes.width = window.innerWidth;
-		this.sizes.height = window.innerHeight;
-
+		this.sizes.resize();
 		// Update camera
-		this.camera.aspect = this.sizes.width / this.sizes.height;
-		this.camera.updateProjectionMatrix();
-
+		this.threeCamera.resize();
 		// Update renderer
-		this.renderer?.setSize(this.sizes.width, this.sizes.height);
-		this.renderer?.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+		this.threeRenderer.resize();
 	};
 
 	public handleScroll = (): void => {
@@ -126,7 +191,7 @@ export class ThreeCanvas {
 		this.controls.update();
 
 		// Render
-		this.renderer.render(this.scene, this.camera);
+		this.threeRenderer.renderer.render(this.scene, this.threeCamera.camera);
 
 		// Call tick again on the next frame
 		window.requestAnimationFrame(this.animationTick);
@@ -137,7 +202,7 @@ export class ThreeCanvas {
 		window.removeEventListener("scroll", this.handleScroll);
 		window.removeEventListener("mousemove", this.handleMouseMove);
 		this.controls.dispose();
-		this.renderer.dispose();
+		this.threeRenderer.renderer.dispose();
 	};
 
 	/**
@@ -163,16 +228,16 @@ export class ThreeCanvas {
 		const normalizedCoordinates = new three.Vector3(coordX, coordY, 0.5);
 
 		// this is the magic trick, it turns the above vector3 to a point according to where the camera sees it
-		normalizedCoordinates.unproject(this.camera);
+		normalizedCoordinates.unproject(this.threeCamera.camera);
 
 		// then this gives us an invisible ray ( from the camera to the normalized Vector3 )
 		// to where we want to position the object to later
 		const direction = normalizedCoordinates
-			.sub(this.camera.position)
+			.sub(this.threeCamera.camera.position)
 			.normalize();
 
 		const fixedDistance = 5;
-		const worldPos = this.camera.position
+		const worldPos = this.threeCamera.camera.position
 			.clone()
 			.add(direction.multiplyScalar(fixedDistance));
 
