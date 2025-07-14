@@ -58,8 +58,12 @@ type MultiHandLandmark = {
 };
 
 enum HandGestures {
+	// pinched scale down or up
 	PINCHED = "pinched",
+	// drag / drop
 	SQUEEZED = "squeezed",
+	// rotate
+	// ....
 }
 
 const calculateTipDistances = (
@@ -249,6 +253,11 @@ const drawHandLandmarks = (multiHandLandmarks: MultiHandLandmark[][]): void => {
 		switch (handleHandGesture(leftHand)) {
 			case HandGestures.PINCHED:
 				console.log("scaling");
+				if (cube.scale.x >= 0.2) {
+					cube.scale.x -= 0.05;
+					cube.scale.y -= 0.05;
+					cube.scale.z -= 0.05;
+				}
 				break;
 			case HandGestures.SQUEEZED:
 				cube.position.copy(worldPos);
