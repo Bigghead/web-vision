@@ -57,6 +57,36 @@ type MultiHandLandmark = {
 	z: number;
 };
 
+const calculateTipDistances = (tips: MultiHandLandmark[]) => {
+	let distance = 0;
+
+	if (tips.length > 1) {
+		for (let i = 1; i < tips.length; i++) {
+			const distanceX = tips[i - 1].x - tips[i].x;
+			const distanceY = tips[i].y - tips[i - 1].y;
+			const distanceZ = tips[i].z - tips[i - 1].z;
+			distance += Math.hypot(distanceX, distanceY, distanceZ);
+		}
+	}
+	return distance;
+};
+
+// const getGestureType = (distance: ) => {
+
+// }
+
+const handleHandGesture = (hand: MultiHandLandmark[]): string => {
+	const fingerTips = [hand[4], hand[8], hand[12], hand[16], hand[20]];
+
+	const pinchDistance = calculateTipDistances(fingerTips);
+	console.log(pinchDistance);
+	if (pinchDistance <= 0.15 && pinchDistance >= 0) {
+		return "squeezed";
+	}
+
+	return "";
+};
+
 const initWebcam = async (): Promise<WebcamResponse> => {
 	return new Promise(async (resolve, reject) => {
 		try {
@@ -181,7 +211,6 @@ const drawHandLandmarks = (multiHandLandmarks: MultiHandLandmark[][]): void => {
 		const leftHand = multiHandLandmarks[0];
 		const rightHand = multiHandLandmarks[1];
 		drawHand(leftHand, rightHand);
-
 		const finger = leftHand[8];
 
 		// Ok, this is kinda intense but the whole gist of it is we need convert a mediapipe coords to usable threejs coords
@@ -191,7 +220,10 @@ const drawHandLandmarks = (multiHandLandmarks: MultiHandLandmark[][]): void => {
 			y: finger.y,
 			mirrored: true,
 		});
-		cube.position.copy(worldPos);
+
+		if (handleHandGesture(leftHand) === "squeezed") {
+			cube.position.copy(worldPos);
+		}
 	}
 };
 
