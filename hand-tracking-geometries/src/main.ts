@@ -1,12 +1,18 @@
 import * as three from "three";
 import { ThreeCanvas } from "../src/lib/canvas";
 import { MediaPipeHands } from "./lib/media-pipe-hands";
+import {
+	ctxLineSize,
+	digits,
+	HandGestures,
+	type MultiHandLandmark,
+	type WebcamResponse,
+} from "./lib/constants";
 
 const canvas = document.querySelector("canvas.webgl") as HTMLCanvasElement;
 const webcam = document.querySelector("video.webcam") as HTMLVideoElement;
 const canvas2d = document.querySelector(".canvas-2d") as HTMLCanvasElement;
 const ctx = canvas2d.getContext("2d") as CanvasRenderingContext2D;
-const ctxLineSize = 2.5;
 
 if (!canvas) {
 	console.error("Canvas element with class 'webgl' not found.");
@@ -22,6 +28,7 @@ const getDimensionsFromElement = (
 		return parseFloat(style.slice(0, -2));
 	});
 };
+
 // Fix blurry canvas drawn lines
 (function fix_dpr() {
 	const dpr = window.devicePixelRatio || 1;
@@ -45,27 +52,6 @@ const cube: three.Mesh<three.BoxGeometry, three.MeshBasicMaterial> =
 
 scene.add(cube);
 
-type WebcamResponse = {
-	success: boolean;
-	error?: string | Error;
-};
-
-type MultiHandLandmark = {
-	visibility: unknown;
-	x: number;
-	y: number;
-	z: number;
-};
-
-enum HandGestures {
-	// pinched scale down or up
-	PINCHED = "pinched",
-	// drag / drop
-	SQUEEZED = "squeezed",
-	// rotate
-	// ....
-}
-
 const calculateTipDistances = (
 	tipA: MultiHandLandmark,
 	tipB: MultiHandLandmark
@@ -75,10 +61,6 @@ const calculateTipDistances = (
 	const distanceZ = tipA.z - tipB.z;
 	return Math.hypot(distanceX, distanceY, distanceZ);
 };
-
-// const getGestureType = (distance: ) => {
-
-// }
 
 const validPinchDistance = (distance: number): boolean => {
 	const distanceThreshold = 0.05;
@@ -147,39 +129,6 @@ const initWebcam = async (): Promise<WebcamResponse> => {
 
 const drawHand = (...hands: MultiHandLandmark[][]): void => {
 	ctx.clearRect(0, 0, canvas2d.width, canvas2d.height);
-
-	const digits = [
-		// Thumb
-		[0, 1],
-		[1, 2],
-		[2, 3],
-		[3, 4],
-		// Index finger
-		[0, 5],
-		[5, 6],
-		[6, 7],
-		[7, 8],
-		// Middle finger
-		[0, 9],
-		[9, 10],
-		[10, 11],
-		[11, 12],
-		// Ring finger
-		[0, 13],
-		[13, 14],
-		[14, 15],
-		[15, 16],
-		// Pinky
-		[0, 17],
-		[17, 18],
-		[18, 19],
-		[19, 20],
-		// Palm
-		[0, 5],
-		[5, 9],
-		[9, 13],
-		[13, 17],
-	];
 
 	hands.forEach((hand) => {
 		if (!hand) return;
