@@ -57,31 +57,56 @@ type MultiHandLandmark = {
 	z: number;
 };
 
-const calculateTipDistances = (tips: MultiHandLandmark[]) => {
-	let distance = 0;
+enum HandGestures {
+	PINCHED = "pinched",
+	SQUEEZED = "squeezed",
+}
 
-	if (tips.length > 1) {
-		for (let i = 1; i < tips.length; i++) {
-			const distanceX = tips[i - 1].x - tips[i].x;
-			const distanceY = tips[i].y - tips[i - 1].y;
-			const distanceZ = tips[i].z - tips[i - 1].z;
-			distance += Math.hypot(distanceX, distanceY, distanceZ);
-		}
-	}
-	return distance;
+const calculateTipDistances = (
+	tipA: MultiHandLandmark,
+	tipB: MultiHandLandmark
+): number => {
+	const distanceX = tipA.x - tipB.x;
+	const distanceY = tipA.y - tipB.y;
+	const distanceZ = tipA.z - tipB.z;
+	return Math.hypot(distanceX, distanceY, distanceZ);
 };
 
 // const getGestureType = (distance: ) => {
 
 // }
 
-const handleHandGesture = (hand: MultiHandLandmark[]): string => {
-	const fingerTips = [hand[4], hand[8], hand[12], hand[16], hand[20]];
+const validPinchDistance = (distance: number): boolean => {
+	const distanceThreshold = 0.05;
+	return distance <= distanceThreshold && distance > 0;
+};
 
-	const pinchDistance = calculateTipDistances(fingerTips);
-	console.log(pinchDistance);
-	if (pinchDistance <= 0.15 && pinchDistance >= 0) {
-		return "squeezed";
+const handleHandGesture = (hand: MultiHandLandmark[]): string => {
+	const thumbTip = hand[4];
+	const indexTip = hand[8];
+
+	// works for pinch ( for scale ), but need to do other fingers for squeezed (drag / drop )
+	const middleTip = hand[12];
+	const ringTip = hand[16];
+	const pinkyTip = hand[20];
+
+	const indexDistance = calculateTipDistances(thumbTip, indexTip);
+	const middleDistance = calculateTipDistances(thumbTip, middleTip);
+	const ringDistance = calculateTipDistances(thumbTip, ringTip);
+	const pinkyDistance = calculateTipDistances(thumbTip, pinkyTip);
+
+	console.log(indexDistance, middleDistance, ringDistance, pinkyDistance);
+
+	const otherFingersPinched =
+		validPinchDistance(middleDistance) &&
+		validPinchDistance(ringDistance) &&
+		validPinchDistance(pinkyDistance);
+	if (validPinchDistance(indexDistance)) {
+		if (!otherFingersPinched) {
+			return HandGestures.PINCHED;
+		} else {
+			return HandGestures.SQUEEZED;
+		}
 	}
 
 	return "";
@@ -221,8 +246,15 @@ const drawHandLandmarks = (multiHandLandmarks: MultiHandLandmark[][]): void => {
 			mirrored: true,
 		});
 
-		if (handleHandGesture(leftHand) === "squeezed") {
-			cube.position.copy(worldPos);
+		switch (handleHandGesture(leftHand)) {
+			case HandGestures.PINCHED:
+				console.log("scaling");
+				break;
+			case HandGestures.SQUEEZED:
+				cube.position.copy(worldPos);
+				break;
+			default:
+				break;
 		}
 	}
 };
