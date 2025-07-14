@@ -18,6 +18,10 @@ if (!canvas) {
 	console.error("Canvas element with class 'webgl' not found.");
 }
 
+const gestures: Record<string, boolean> = {
+	[HandGestures.PINCHED]: false,
+};
+
 const getDimensionsFromElement = (
 	element: HTMLElement,
 	...properties: string[]
@@ -81,17 +85,27 @@ const handleHandGesture = (hand: MultiHandLandmark[]): string => {
 	const ringDistance = calculateTipDistances(thumbTip, ringTip);
 	const pinkyDistance = calculateTipDistances(thumbTip, pinkyTip);
 
-	console.log(indexDistance, middleDistance, ringDistance, pinkyDistance);
+	// console.log(indexDistance, middleDistance, ringDistance, pinkyDistance);
 
 	const otherFingersPinched =
 		validPinchDistance(middleDistance) &&
 		validPinchDistance(ringDistance) &&
 		validPinchDistance(pinkyDistance);
+
 	if (validPinchDistance(indexDistance)) {
 		if (!otherFingersPinched) {
+			gestures[HandGestures.PINCHED] = true;
 			return HandGestures.PINCHED;
 		} else {
+			gestures[HandGestures.PINCHED] = false;
 			return HandGestures.SQUEEZED;
+		}
+	}
+
+	// this works but need a way to stop it
+	if (gestures[HandGestures.PINCHED]) {
+		if (indexDistance > 0.1) {
+			return HandGestures.SCALEUP;
 		}
 	}
 
@@ -201,11 +215,20 @@ const drawHandLandmarks = (multiHandLandmarks: MultiHandLandmark[][]): void => {
 
 		switch (handleHandGesture(leftHand)) {
 			case HandGestures.PINCHED:
-				console.log("scaling");
 				if (cube.scale.x >= 0.2) {
 					cube.scale.x -= 0.05;
 					cube.scale.y -= 0.05;
 					cube.scale.z -= 0.05;
+				}
+				break;
+			case HandGestures.SCALEUP:
+				console.log("scaling Up");
+				if (cube.scale.x <= 5) {
+					console.log(cube.scale.x);
+
+					cube.scale.x += 0.05;
+					cube.scale.y += 0.05;
+					cube.scale.z += 0.05;
 				}
 				break;
 			case HandGestures.SQUEEZED:

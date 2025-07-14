@@ -15,6 +15,8 @@ export type MultiHandLandmark = {
 export const HandGestures = Object.freeze({
 	// pinched scale down or up
 	PINCHED: "pinched",
+
+	SCALEUP: "scaleup",
 	// drag / drop
 	SQUEEZED: "squeezed",
 	// rotate
