@@ -18,8 +18,9 @@ if (!canvas) {
 	console.error("Canvas element with class 'webgl' not found.");
 }
 
-const gestures: Record<string, boolean> = {
+const gestures: Record<string, boolean | string> = {
 	[HandGestures.PINCHED]: false,
+	lastGesture: "",
 };
 
 const getDimensionsFromElement = (
@@ -85,7 +86,26 @@ const handleHandGesture = (hand: MultiHandLandmark[]): string => {
 	const ringDistance = calculateTipDistances(thumbTip, ringTip);
 	const pinkyDistance = calculateTipDistances(thumbTip, pinkyTip);
 
+	const indexBase = hand[5];
+	const middleBase = hand[9];
+	const ringBase = hand[13];
+	const pinkyBase = hand[17];
+
+	const indexTipToBaseDistance = calculateTipDistances(indexTip, indexBase);
+	const middleTipToBaseDistance = calculateTipDistances(middleTip, middleBase);
+	const ringTipToBaseDistance = calculateTipDistances(ringTip, ringBase);
+	const pinkyTipToBaseDistance = calculateTipDistances(pinkyTip, pinkyBase);
+
 	// console.log(indexDistance, middleDistance, ringDistance, pinkyDistance);
+	if (
+		indexTipToBaseDistance < 0.06 &&
+		middleTipToBaseDistance < 0.06 &&
+		ringTipToBaseDistance < 0.06 &&
+		pinkyTipToBaseDistance < 0.06
+	) {
+		gestures[HandGestures.PINCHED] = false;
+		return HandGestures.FIST;
+	}
 
 	const otherFingersPinched =
 		validPinchDistance(middleDistance) &&
@@ -93,11 +113,15 @@ const handleHandGesture = (hand: MultiHandLandmark[]): string => {
 		validPinchDistance(pinkyDistance);
 
 	if (validPinchDistance(indexDistance)) {
-		if (!otherFingersPinched) {
+		if (gestures.lastGesture !== HandGestures.FIST && !otherFingersPinched) {
+			console.log("pinch");
+
 			gestures[HandGestures.PINCHED] = true;
+
 			return HandGestures.PINCHED;
 		} else {
-			gestures[HandGestures.PINCHED] = false;
+			console.log("squeeze");
+
 			return HandGestures.SQUEEZED;
 		}
 	}
@@ -105,6 +129,8 @@ const handleHandGesture = (hand: MultiHandLandmark[]): string => {
 	// this works but need a way to stop it
 	if (gestures[HandGestures.PINCHED]) {
 		if (indexDistance > 0.1) {
+			console.log("unpinch");
+
 			return HandGestures.SCALEUP;
 		}
 	}
@@ -214,6 +240,8 @@ const drawHandLandmarks = (multiHandLandmarks: MultiHandLandmark[][]): void => {
 		});
 
 		switch (handleHandGesture(leftHand)) {
+			case HandGestures.FIST:
+				break;
 			case HandGestures.PINCHED:
 				if (cube.scale.x >= 0.2) {
 					cube.scale.x -= 0.05;

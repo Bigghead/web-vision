@@ -19,6 +19,8 @@ export const HandGestures = Object.freeze({
 	SCALEUP: "scaleup",
 	// drag / drop
 	SQUEEZED: "squeezed",
+
+	FIST: "fist",
 	// rotate
 	// ....
 });
