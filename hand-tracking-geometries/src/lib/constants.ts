@@ -12,6 +12,13 @@ export type MultiHandLandmark = {
 	z: number;
 };
 
+export type MultiHandedness = {
+	displayName: string | undefined;
+	index: number;
+	label: "Left" | "Right";
+	score: number;
+};
+
 export const HandGestures = Object.freeze({
 	// pinched scale down or up
 	PINCHED: "pinched",
