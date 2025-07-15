@@ -58,10 +58,10 @@ const getDimensionsFromElement = (
 	canvas2d.setAttribute("width", (width * dpr).toString());
 })();
 
-const handleHandGesture = (hand: MultiHandLandmark[]): string => {
+const detectHandGesture = (hand: MultiHandLandmark[]): string => {
 	const fingerDistances = gestures.calculateDistancesBetweenFingers(hand);
 
-	const { fingerTip: indexTip, distanceToThumb: indexDistance } =
+	const { fingerTip: indexTip, distanceToThumb: indexToThumbDistance } =
 		fingerDistances[0];
 
 	const isHandHoveringOverObject = gestures.isHandHoveringAboveObject({
@@ -72,37 +72,53 @@ const handleHandGesture = (hand: MultiHandLandmark[]): string => {
 
 	if (!isHandHoveringOverObject) return "";
 
-	const makingFist = gestures.allFingersMakingFist(fingerDistances);
-	const validPinch = gestures.validPinchDistance(indexDistance);
-	const otherFingersPinched = gestures.checkOtherFingersPinched(
-		fingerDistances.slice(1)
-	);
+	return gestures.detectGesture({
+		fingerDistances,
+		indexToThumbDistance,
+	});
+};
 
-	if (makingFist) {
-		console.log("fist");
-		return HandGestures.FIST;
+const scaleObject = (
+	threeObj: three.Mesh,
+	scaleDirection: "up" | "down"
+): void => {
+	// scale down ( negative ) if down direction
+	const scaleStep =
+		scaleDirection === "up" ? objectScaleTick : -objectScaleTick;
+
+	if (threeObj.scale.x >= 0.2 && threeObj.scale.x <= 5) {
+		threeObj.scale.x += scaleStep;
+		threeObj.scale.y += scaleStep;
+		threeObj.scale.z += scaleStep;
 	}
+};
 
-	if (otherFingersPinched) {
-		console.log("squeeze");
-		return HandGestures.SQUEEZED;
+const handleHandGesture = (hand: MultiHandLandmark[]) => {
+	const finger = hand[8];
+
+	// Ok, this is kinda intense but the whole gist of it is we need convert a mediapipe coords to usable threejs coords
+	// mediapipe goes from 0 ( left of screen ) to 1 ( right end of screen )
+	const worldPos = getNormalizedDeviceCoords({
+		x: finger.x,
+		y: finger.y,
+		mirrored: true,
+	});
+
+	switch (detectHandGesture(hand)) {
+		case HandGestures.FIST:
+			break;
+		case HandGestures.PINCHED:
+			scaleObject(cube, "down");
+			break;
+		case HandGestures.UNPINCH:
+			scaleObject(cube, "up");
+			break;
+		case HandGestures.SQUEEZED:
+			cube.position.copy(worldPos);
+			break;
+		default:
+			break;
 	}
-
-	if (validPinch && !otherFingersPinched && !makingFist) {
-		console.log("pinch");
-		return HandGestures.PINCHED;
-	}
-
-	// still need a differernt gesture for this
-	// maybe need 2 hands for this one
-	// if (gestures[HandGestures.PINCHED]) {
-	// 	if (indexDistance > 0.1) {
-	// 		console.log("unpinch");
-	// 		return HandGestures.UNPINCH;
-	// 	}
-	// }
-
-	return "";
 };
 
 const initWebcam = async (): Promise<WebcamResponse> => {
@@ -186,21 +202,6 @@ const drawPointOnFinger = (
 	ctx.fill();
 };
 
-const scaleObject = (
-	threeObj: three.Mesh,
-	scaleDirection: "up" | "down"
-): void => {
-	// scale down ( negative ) if down direction
-	const scaleStep =
-		scaleDirection === "up" ? objectScaleTick : -objectScaleTick;
-
-	if (threeObj.scale.x >= 0.2 && threeObj.scale.x <= 5) {
-		threeObj.scale.x += scaleStep;
-		threeObj.scale.y += scaleStep;
-		threeObj.scale.z += scaleStep;
-	}
-};
-
 const drawHandLandmarks = (
 	multiHandLandmarks: MultiHandLandmark[][],
 	multiHandedness: MultiHandedness[]
@@ -212,31 +213,7 @@ const drawHandLandmarks = (
 
 		multiHandLandmarks.forEach((hand, index) => {
 			drawHand(hand);
-			const finger = hand[8];
-
-			// Ok, this is kinda intense but the whole gist of it is we need convert a mediapipe coords to usable threejs coords
-			// mediapipe goes from 0 ( left of screen ) to 1 ( right end of screen )
-			const worldPos = getNormalizedDeviceCoords({
-				x: finger.x,
-				y: finger.y,
-				mirrored: true,
-			});
-
-			switch (handleHandGesture(hand)) {
-				case HandGestures.FIST:
-					break;
-				case HandGestures.PINCHED:
-					scaleObject(cube, "down");
-					break;
-				case HandGestures.UNPINCH:
-					scaleObject(cube, "up");
-					break;
-				case HandGestures.SQUEEZED:
-					cube.position.copy(worldPos);
-					break;
-				default:
-					break;
-			}
+			handleHandGesture(hand);
 		});
 	}
 };

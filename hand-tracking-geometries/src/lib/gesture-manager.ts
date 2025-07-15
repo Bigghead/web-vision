@@ -1,12 +1,17 @@
 import * as three from "three";
 import {
+	HandGestures,
 	pinchDistanceThreshold,
 	type FingerDistance,
 	type MultiHandLandmark,
 } from "./constants";
 
 export class HandGestureManager {
-	calculateTipDistances(
+	// the indices of where mediapipe flags as tips or base / start of finger
+	private readonly fingerTipsIndices = [4, 8, 12, 16, 20];
+	private readonly fingerBasesIndices = [0, 5, 9, 13, 17];
+
+	private calculateTipDistances(
 		tipA: MultiHandLandmark,
 		tipB: MultiHandLandmark
 	): number {
@@ -15,7 +20,7 @@ export class HandGestureManager {
 		return Math.hypot(distanceX, distanceY);
 	}
 
-	validPinchDistance(distance: number): boolean {
+	private validPinchDistance(distance: number): boolean {
 		return distance <= pinchDistanceThreshold;
 	}
 
@@ -56,13 +61,9 @@ export class HandGestureManager {
 	calculateDistancesBetweenFingers = (
 		hand: MultiHandLandmark[]
 	): FingerDistance[] => {
-		// the indices of where mediapipe flags as tips or base / start of finger
-		const fingerTipsIndices = [4, 8, 12, 16, 20];
-		const fingerBasesIndices = [0, 5, 9, 13, 17];
-
-		const fingers = fingerTipsIndices.map((tip, index) => ({
+		const fingers = this.fingerTipsIndices.map((tip, index) => ({
 			fingerTip: hand[tip],
-			fingerBase: hand[fingerBasesIndices[index]],
+			fingerBase: hand[this.fingerBasesIndices[index]],
 		}));
 
 		const thumbTip = fingers[0].fingerTip;
@@ -82,16 +83,56 @@ export class HandGestureManager {
 	};
 
 	// checking if all non-thumb fingers are curled into a fist.
-	allFingersMakingFist = (fingers: FingerDistance[]): boolean => {
+	private allFingersMakingFist = (fingers: FingerDistance[]): boolean => {
 		return fingers.every(
 			(finger) => finger.distanceToBase < pinchDistanceThreshold - 0.02
 		);
 	};
 
 	// checking if the middle, ring, and pinky fingers are "pinched" towards the thumb.
-	checkOtherFingersPinched = (fingers: FingerDistance[]): boolean => {
+	private checkOtherFingersPinched = (fingers: FingerDistance[]): boolean => {
 		return fingers.every((finger) =>
 			this.validPinchDistance(finger.distanceToThumb)
 		);
 	};
+
+	detectGesture({
+		fingerDistances,
+		indexToThumbDistance,
+	}: {
+		fingerDistances: FingerDistance[];
+		indexToThumbDistance: number;
+	}): string {
+		const makingFist = this.allFingersMakingFist(fingerDistances);
+		const validPinch = this.validPinchDistance(indexToThumbDistance);
+		const otherFingersPinched = this.checkOtherFingersPinched(
+			fingerDistances.slice(1)
+		);
+
+		if (makingFist) {
+			console.log("fist");
+			return HandGestures.FIST;
+		}
+
+		if (otherFingersPinched) {
+			console.log("squeeze");
+			return HandGestures.SQUEEZED;
+		}
+
+		if (validPinch && !otherFingersPinched && !makingFist) {
+			console.log("pinch");
+			return HandGestures.PINCHED;
+		}
+
+		// still need a differernt gesture for this
+		// maybe need 2 hands for this one
+		// if (gestures[HandGestures.PINCHED]) {
+		// 	if (indexDistance > 0.1) {
+		// 		console.log("unpinch");
+		// 		return HandGestures.UNPINCH;
+		// 	}
+		// }
+
+		return "";
+	}
 }
