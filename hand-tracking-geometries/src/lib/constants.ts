@@ -1,4 +1,6 @@
 export const ctxLineSize = 2.5;
+export const objectScaleTick = 0.05;
+export const pinchDistanceThreshold = 0.08;
 
 export type WebcamResponse = {
 	success: boolean;

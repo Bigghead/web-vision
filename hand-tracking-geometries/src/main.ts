@@ -5,6 +5,8 @@ import {
 	ctxLineSize,
 	digits,
 	HandGestures,
+	objectScaleTick,
+	pinchDistanceThreshold,
 	type MultiHandedness,
 	type MultiHandLandmark,
 	type WebcamResponse,
@@ -69,8 +71,7 @@ const calculateTipDistances = (
 };
 
 const validPinchDistance = (distance: number): boolean => {
-	const distanceThreshold = 0.08;
-	return distance <= distanceThreshold;
+	return distance <= pinchDistanceThreshold;
 };
 
 const isHandHoveringAboveObject = (tips: MultiHandLandmark[]): boolean => {
@@ -90,7 +91,9 @@ const isHandHoveringAboveObject = (tips: MultiHandLandmark[]): boolean => {
 		const dy = objectY - tip.y;
 		const distance = Math.sqrt(dx * dx + dy * dy);
 
-		if (distance > 0.05) {
+		// need 0.1 to be a "zone" of where the object is
+		// but it's ok for now
+		if (distance > 0.1) {
 			allTipsAboveObject = false;
 		}
 	});
@@ -132,10 +135,10 @@ const handleHandGesture = (hand: MultiHandLandmark[]): string => {
 	if (!isHandHoveringAboveObject([indexTip])) return "";
 
 	if (
-		indexTipToBaseDistance < 0.06 &&
-		middleTipToBaseDistance < 0.06 &&
-		ringTipToBaseDistance < 0.06 &&
-		pinkyTipToBaseDistance < 0.06
+		indexTipToBaseDistance < pinchDistanceThreshold - 0.02 &&
+		middleTipToBaseDistance < pinchDistanceThreshold - 0.02 &&
+		ringTipToBaseDistance < pinchDistanceThreshold - 0.02 &&
+		pinkyTipToBaseDistance < pinchDistanceThreshold - 0.02
 	) {
 		console.log("fist");
 
@@ -253,12 +256,26 @@ const drawPointOnFinger = (
 	ctx.fill();
 };
 
+const scaleObject = (
+	threeObj: three.Mesh,
+	scaleDirection: "up" | "down"
+): void => {
+	// scale down ( negative ) if down direction
+	const scaleStep =
+		scaleDirection === "up" ? objectScaleTick : -objectScaleTick;
+
+	if (threeObj.scale.x >= 0.2 && threeObj.scale.x <= 5) {
+		threeObj.scale.x += scaleStep;
+		threeObj.scale.y += scaleStep;
+		threeObj.scale.z += scaleStep;
+	}
+};
+
 const drawHandLandmarks = (
 	multiHandLandmarks: MultiHandLandmark[][],
 	multiHandedness: MultiHandedness[]
 ): void => {
 	// landmarks are 20 points on your hand, with 0 - 5 being where your palm begins and thumb ends split into 5
-	console.log(multiHandLandmarks.length);
 
 	if (multiHandLandmarks.length) {
 		ctx.clearRect(0, 0, canvas2d.width, canvas2d.height);
@@ -279,18 +296,10 @@ const drawHandLandmarks = (
 				case HandGestures.FIST:
 					break;
 				case HandGestures.PINCHED:
-					if (cube.scale.x >= 0.2) {
-						cube.scale.x -= 0.05;
-						cube.scale.y -= 0.05;
-						cube.scale.z -= 0.05;
-					}
+					scaleObject(cube, "down");
 					break;
 				case HandGestures.UNPINCH:
-					if (cube.scale.x <= 5) {
-						cube.scale.x += 0.05;
-						cube.scale.y += 0.05;
-						cube.scale.z += 0.05;
-					}
+					scaleObject(cube, "up");
 					break;
 				case HandGestures.SQUEEZED:
 					cube.position.copy(worldPos);
