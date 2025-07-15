@@ -46,6 +46,7 @@ const threeCanvas = new ThreeCanvas({ canvas, initShadow: false });
 const {
 	sizes: { width, height },
 	scene,
+	threeCamera: { camera },
 	getNormalizedDeviceCoords,
 } = threeCanvas;
 
@@ -63,13 +64,36 @@ const calculateTipDistances = (
 ): number => {
 	const distanceX = tipA.x - tipB.x;
 	const distanceY = tipA.y - tipB.y;
-	const distanceZ = tipA.z - tipB.z;
-	return Math.hypot(distanceX, distanceY, distanceZ);
+	return Math.hypot(distanceX, distanceY);
 };
 
 const validPinchDistance = (distance: number): boolean => {
-	const distanceThreshold = 0.05;
-	return distance <= distanceThreshold && distance > 0;
+	const distanceThreshold = 0.08;
+	return distance <= distanceThreshold;
+};
+
+const isHandHoveringAboveObject = (tips: MultiHandLandmark[]): boolean => {
+	let allTipsAboveObject = true;
+	const vector = new three.Vector3();
+	vector.copy(cube.position);
+	vector.project(camera);
+
+	// now vector x/y/z are in a range from -1 - 1 ( normalized coordinates )
+	// we need to convert to mediapipe coordinates ( from 0 to 1 )
+
+	const objectX = (vector.x + 1) / 2;
+	const objectY = (1 - vector.y) / 2;
+
+	tips.forEach((tip) => {
+		const dx = objectX - (1 - tip.x);
+		const dy = objectY - tip.y;
+		const distance = Math.sqrt(dx * dx + dy * dy);
+
+		if (distance > 0.05) {
+			allTipsAboveObject = false;
+		}
+	});
+	return allTipsAboveObject;
 };
 
 const handleHandGesture = (hand: MultiHandLandmark[]): string => {
@@ -97,12 +121,23 @@ const handleHandGesture = (hand: MultiHandLandmark[]): string => {
 	const pinkyTipToBaseDistance = calculateTipDistances(pinkyTip, pinkyBase);
 
 	// console.log(indexDistance, middleDistance, ringDistance, pinkyDistance);
+	// console.log(
+	// 	indexTipToBaseDistance,
+	// 	middleTipToBaseDistance,
+	// 	ringTipToBaseDistance,
+	// 	pinkyTipToBaseDistance
+	// );
+
+	if (!isHandHoveringAboveObject([indexTip])) return "";
+
 	if (
 		indexTipToBaseDistance < 0.06 &&
 		middleTipToBaseDistance < 0.06 &&
 		ringTipToBaseDistance < 0.06 &&
 		pinkyTipToBaseDistance < 0.06
 	) {
+		console.log("fist");
+
 		gestures[HandGestures.PINCHED] = false;
 		return HandGestures.FIST;
 	}
@@ -113,11 +148,9 @@ const handleHandGesture = (hand: MultiHandLandmark[]): string => {
 		validPinchDistance(pinkyDistance);
 
 	if (validPinchDistance(indexDistance)) {
-		if (gestures.lastGesture !== HandGestures.FIST && !otherFingersPinched) {
+		if (!otherFingersPinched) {
 			console.log("pinch");
-
 			gestures[HandGestures.PINCHED] = true;
-
 			return HandGestures.PINCHED;
 		} else {
 			console.log("squeeze");
@@ -127,13 +160,13 @@ const handleHandGesture = (hand: MultiHandLandmark[]): string => {
 	}
 
 	// this works but need a way to stop it
-	if (gestures[HandGestures.PINCHED]) {
-		if (indexDistance > 0.1) {
-			console.log("unpinch");
-
-			return HandGestures.SCALEUP;
-		}
-	}
+	// maybe need 2 hands for this one
+	// if (gestures[HandGestures.PINCHED]) {
+	// 	if (indexDistance > 0.1) {
+	// 		console.log("unpinch");
+	// 		return HandGestures.UNPINCH;
+	// 	}
+	// }
 
 	return "";
 };
@@ -249,11 +282,8 @@ const drawHandLandmarks = (multiHandLandmarks: MultiHandLandmark[][]): void => {
 					cube.scale.z -= 0.05;
 				}
 				break;
-			case HandGestures.SCALEUP:
-				console.log("scaling Up");
+			case HandGestures.UNPINCH:
 				if (cube.scale.x <= 5) {
-					console.log(cube.scale.x);
-
 					cube.scale.x += 0.05;
 					cube.scale.y += 0.05;
 					cube.scale.z += 0.05;
