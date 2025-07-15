@@ -100,56 +100,70 @@ const isHandHoveringAboveObject = (tips: MultiHandLandmark[]): boolean => {
 	return allTipsAboveObject;
 };
 
+type FingerDistance = {
+	fingerTip: MultiHandLandmark;
+	distanceToThumb: number;
+	distanceToBase: number;
+};
+
+const calculateDistancesBetweenFingers = (
+	hand: MultiHandLandmark[]
+): FingerDistance[] => {
+	// the indices of where mediapipe flags as tips or base / start of finger
+	const fingerTipsIndices = [4, 8, 12, 16, 20];
+	const fingerBasesIndices = [0, 5, 9, 13, 17];
+
+	const fingers = fingerTipsIndices.map((tip, index) => ({
+		fingerTip: hand[tip],
+		fingerBase: hand[fingerBasesIndices[index]],
+	}));
+
+	const thumbTip = fingers[0].fingerTip;
+
+	// remove thumb from result cause we only care about calculated distance from thumb or other bases
+	const nonThumbFingerDistances = fingers
+		.slice(1)
+		.map(({ fingerTip, fingerBase }) => {
+			return {
+				fingerTip,
+				distanceToThumb: calculateTipDistances(thumbTip, fingerTip),
+				distanceToBase: calculateTipDistances(fingerTip, fingerBase),
+			};
+		});
+
+	return nonThumbFingerDistances;
+};
+
+// checking if all non-thumb fingers (Index, Middle, Ring, Pinky) are curled into a fist.
+const allFingersMakingFist = (fingers: FingerDistance[]): boolean => {
+	return fingers.every(
+		(finger) => finger.distanceToBase < pinchDistanceThreshold - 0.02
+	);
+};
+
+// Only checking last 3 fingers
+// We are checking if other fingers other than index / thumb are pinched
+const checkOtherFingersPinched = (fingers: FingerDistance[]): boolean => {
+	return fingers.every((finger) => validPinchDistance(finger.distanceToThumb));
+};
+
 const handleHandGesture = (hand: MultiHandLandmark[]): string => {
-	const thumbTip = hand[4];
-	const indexTip = hand[8];
+	const fingerDistances = calculateDistancesBetweenFingers(hand);
 
-	// works for pinch ( for scale ), but need to do other fingers for squeezed (drag / drop )
-	const middleTip = hand[12];
-	const ringTip = hand[16];
-	const pinkyTip = hand[20];
-
-	const indexDistance = calculateTipDistances(thumbTip, indexTip);
-	const middleDistance = calculateTipDistances(thumbTip, middleTip);
-	const ringDistance = calculateTipDistances(thumbTip, ringTip);
-	const pinkyDistance = calculateTipDistances(thumbTip, pinkyTip);
-
-	const indexBase = hand[5];
-	const middleBase = hand[9];
-	const ringBase = hand[13];
-	const pinkyBase = hand[17];
-
-	const indexTipToBaseDistance = calculateTipDistances(indexTip, indexBase);
-	const middleTipToBaseDistance = calculateTipDistances(middleTip, middleBase);
-	const ringTipToBaseDistance = calculateTipDistances(ringTip, ringBase);
-	const pinkyTipToBaseDistance = calculateTipDistances(pinkyTip, pinkyBase);
-
-	// console.log(indexDistance, middleDistance, ringDistance, pinkyDistance);
-	// console.log(
-	// 	indexTipToBaseDistance,
-	// 	middleTipToBaseDistance,
-	// 	ringTipToBaseDistance,
-	// 	pinkyTipToBaseDistance
-	// );
+	const { fingerTip: indexTip, distanceToThumb: indexDistance } =
+		fingerDistances[0];
 
 	if (!isHandHoveringAboveObject([indexTip])) return "";
 
-	if (
-		indexTipToBaseDistance < pinchDistanceThreshold - 0.02 &&
-		middleTipToBaseDistance < pinchDistanceThreshold - 0.02 &&
-		ringTipToBaseDistance < pinchDistanceThreshold - 0.02 &&
-		pinkyTipToBaseDistance < pinchDistanceThreshold - 0.02
-	) {
+	if (allFingersMakingFist(fingerDistances)) {
 		console.log("fist");
-
 		gestures[HandGestures.PINCHED] = false;
 		return HandGestures.FIST;
 	}
 
-	const otherFingersPinched =
-		validPinchDistance(middleDistance) &&
-		validPinchDistance(ringDistance) &&
-		validPinchDistance(pinkyDistance);
+	const otherFingersPinched = checkOtherFingersPinched(
+		fingerDistances.slice(1)
+	);
 
 	if (validPinchDistance(indexDistance)) {
 		if (!otherFingersPinched) {
@@ -163,7 +177,7 @@ const handleHandGesture = (hand: MultiHandLandmark[]): string => {
 		}
 	}
 
-	// this works but need a way to stop it
+	// still need a differernt gesture for this
 	// maybe need 2 hands for this one
 	// if (gestures[HandGestures.PINCHED]) {
 	// 	if (indexDistance > 0.1) {
