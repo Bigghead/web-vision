@@ -1,47 +1,11 @@
-import { pinchDistanceThreshold, type MultiHandLandmark } from "./constants";
+import * as three from "three";
+import {
+	pinchDistanceThreshold,
+	type FingerDistance,
+	type MultiHandLandmark,
+} from "./constants";
 
-declare const Hands: any;
-declare const Camera: any;
-
-export class MediaPipeHands {
-	camera;
-	constructor(
-		videoElement: HTMLVideoElement,
-		width: number,
-		height: number,
-		callbackFunc: unknown
-	) {
-		const hands = new Hands({
-			locateFile: (file: string) => {
-				return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
-			},
-		});
-
-		hands.setOptions({
-			maxNumHands: 2,
-			modelComplexity: 1,
-			minDetectionConfidence: 0.5,
-			minTrackingConfidence: 0.5,
-		});
-
-		// this callback function is called everytime mediapipe successfully processes a video frame
-		hands.onResults(callbackFunc);
-
-		this.camera = new Camera(videoElement, {
-			async onFrame() {
-				await hands.send({ image: videoElement });
-			},
-			width,
-			height,
-		});
-	}
-
-	start() {
-		if (this.camera) this.camera.start();
-	}
-}
-
-export class HandGesture {
+export class HandGestureManager {
 	calculateTipDistances(
 		tipA: MultiHandLandmark,
 		tipB: MultiHandLandmark
@@ -55,10 +19,18 @@ export class HandGesture {
 		return distance <= pinchDistanceThreshold;
 	}
 
-	isHandHoveringAboveObject = (tips: MultiHandLandmark[]): boolean => {
+	isHandHoveringAboveObject = ({
+		tips,
+		threeObject,
+		camera,
+	}: {
+		tips: MultiHandLandmark[];
+		threeObject: three.Mesh;
+		camera: three.Camera;
+	}): boolean => {
 		let allTipsAboveObject = true;
 		const vector = new three.Vector3();
-		vector.copy(cube.position);
+		vector.copy(threeObject.position);
 		vector.project(camera);
 
 		// now vector x/y/z are in a range from -1 - 1 ( normalized coordinates )
@@ -101,8 +73,8 @@ export class HandGesture {
 			.map(({ fingerTip, fingerBase }) => {
 				return {
 					fingerTip,
-					distanceToThumb: calculateTipDistances(thumbTip, fingerTip),
-					distanceToBase: calculateTipDistances(fingerTip, fingerBase),
+					distanceToThumb: this.calculateTipDistances(thumbTip, fingerTip),
+					distanceToBase: this.calculateTipDistances(fingerTip, fingerBase),
 				};
 			});
 
@@ -119,7 +91,7 @@ export class HandGesture {
 	// checking if the middle, ring, and pinky fingers are "pinched" towards the thumb.
 	checkOtherFingersPinched = (fingers: FingerDistance[]): boolean => {
 		return fingers.every((finger) =>
-			validPinchDistance(finger.distanceToThumb)
+			this.validPinchDistance(finger.distanceToThumb)
 		);
 	};
 }

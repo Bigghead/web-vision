@@ -6,11 +6,11 @@ import {
 	digits,
 	HandGestures,
 	objectScaleTick,
-	pinchDistanceThreshold,
 	type MultiHandedness,
 	type MultiHandLandmark,
 	type WebcamResponse,
 } from "./lib/constants";
+import { HandGestureManager } from "./lib/gesture-manager";
 
 const canvas = document.querySelector("canvas.webgl") as HTMLCanvasElement;
 const webcam = document.querySelector("video.webcam") as HTMLVideoElement;
@@ -21,10 +21,23 @@ if (!canvas) {
 	console.error("Canvas element with class 'webgl' not found.");
 }
 
-const gestures: Record<string, boolean | string> = {
-	[HandGestures.PINCHED]: false,
-	lastGesture: "",
-};
+const threeCanvas = new ThreeCanvas({ canvas, initShadow: false });
+const {
+	sizes: { width, height },
+	scene,
+	threeCamera: { camera },
+	getNormalizedDeviceCoords,
+} = threeCanvas;
+
+const cube: three.Mesh<three.BoxGeometry, three.MeshBasicMaterial> =
+	new three.Mesh(
+		new three.BoxGeometry(1, 1, 1),
+		new three.MeshBasicMaterial({ color: 0x00ff00, wireframe: true })
+	);
+
+scene.add(cube);
+
+const gestures = new HandGestureManager();
 
 const getDimensionsFromElement = (
 	element: HTMLElement,
@@ -45,136 +58,39 @@ const getDimensionsFromElement = (
 	canvas2d.setAttribute("width", (width * dpr).toString());
 })();
 
-const threeCanvas = new ThreeCanvas({ canvas, initShadow: false });
-const {
-	sizes: { width, height },
-	scene,
-	threeCamera: { camera },
-	getNormalizedDeviceCoords,
-} = threeCanvas;
-
-const cube: three.Mesh<three.BoxGeometry, three.MeshBasicMaterial> =
-	new three.Mesh(
-		new three.BoxGeometry(1, 1, 1),
-		new three.MeshBasicMaterial({ color: 0x00ff00, wireframe: true })
-	);
-
-scene.add(cube);
-
-const calculateTipDistances = (
-	tipA: MultiHandLandmark,
-	tipB: MultiHandLandmark
-): number => {
-	const distanceX = tipA.x - tipB.x;
-	const distanceY = tipA.y - tipB.y;
-	return Math.hypot(distanceX, distanceY);
-};
-
-const validPinchDistance = (distance: number): boolean => {
-	return distance <= pinchDistanceThreshold;
-};
-
-const isHandHoveringAboveObject = (tips: MultiHandLandmark[]): boolean => {
-	let allTipsAboveObject = true;
-	const vector = new three.Vector3();
-	vector.copy(cube.position);
-	vector.project(camera);
-
-	// now vector x/y/z are in a range from -1 - 1 ( normalized coordinates )
-	// we need to convert to mediapipe coordinates ( from 0 to 1 )
-
-	const objectX = (vector.x + 1) / 2;
-	const objectY = (1 - vector.y) / 2;
-
-	tips.forEach((tip) => {
-		const dx = objectX - (1 - tip.x);
-		const dy = objectY - tip.y;
-		const distance = Math.sqrt(dx * dx + dy * dy);
-
-		// need 0.1 to be a "zone" of where the object is
-		// but it's ok for now
-		if (distance > 0.1) {
-			allTipsAboveObject = false;
-		}
-	});
-	return allTipsAboveObject;
-};
-
-type FingerDistance = {
-	fingerTip: MultiHandLandmark;
-	distanceToThumb: number;
-	distanceToBase: number;
-};
-
-const calculateDistancesBetweenFingers = (
-	hand: MultiHandLandmark[]
-): FingerDistance[] => {
-	// the indices of where mediapipe flags as tips or base / start of finger
-	const fingerTipsIndices = [4, 8, 12, 16, 20];
-	const fingerBasesIndices = [0, 5, 9, 13, 17];
-
-	const fingers = fingerTipsIndices.map((tip, index) => ({
-		fingerTip: hand[tip],
-		fingerBase: hand[fingerBasesIndices[index]],
-	}));
-
-	const thumbTip = fingers[0].fingerTip;
-
-	// remove thumb from result cause we only care about calculated distance from thumb or other bases
-	const nonThumbFingerDistances = fingers
-		.slice(1)
-		.map(({ fingerTip, fingerBase }) => {
-			return {
-				fingerTip,
-				distanceToThumb: calculateTipDistances(thumbTip, fingerTip),
-				distanceToBase: calculateTipDistances(fingerTip, fingerBase),
-			};
-		});
-
-	return nonThumbFingerDistances;
-};
-
-// checking if all non-thumb fingers (Index, Middle, Ring, Pinky) are curled into a fist.
-const allFingersMakingFist = (fingers: FingerDistance[]): boolean => {
-	return fingers.every(
-		(finger) => finger.distanceToBase < pinchDistanceThreshold - 0.02
-	);
-};
-
-// Only checking last 3 fingers
-// We are checking if other fingers other than index / thumb are pinched
-const checkOtherFingersPinched = (fingers: FingerDistance[]): boolean => {
-	return fingers.every((finger) => validPinchDistance(finger.distanceToThumb));
-};
-
 const handleHandGesture = (hand: MultiHandLandmark[]): string => {
-	const fingerDistances = calculateDistancesBetweenFingers(hand);
+	const fingerDistances = gestures.calculateDistancesBetweenFingers(hand);
 
 	const { fingerTip: indexTip, distanceToThumb: indexDistance } =
 		fingerDistances[0];
 
-	if (!isHandHoveringAboveObject([indexTip])) return "";
+	const isHandHoveringOverObject = gestures.isHandHoveringAboveObject({
+		tips: [indexTip],
+		threeObject: cube,
+		camera,
+	});
 
-	if (allFingersMakingFist(fingerDistances)) {
-		console.log("fist");
-		gestures[HandGestures.PINCHED] = false;
-		return HandGestures.FIST;
-	}
+	if (!isHandHoveringOverObject) return "";
 
-	const otherFingersPinched = checkOtherFingersPinched(
+	const makingFist = gestures.allFingersMakingFist(fingerDistances);
+	const validPinch = gestures.validPinchDistance(indexDistance);
+	const otherFingersPinched = gestures.checkOtherFingersPinched(
 		fingerDistances.slice(1)
 	);
 
-	if (validPinchDistance(indexDistance)) {
-		if (!otherFingersPinched) {
-			console.log("pinch");
-			gestures[HandGestures.PINCHED] = true;
-			return HandGestures.PINCHED;
-		} else {
-			console.log("squeeze");
+	if (makingFist) {
+		console.log("fist");
+		return HandGestures.FIST;
+	}
 
-			return HandGestures.SQUEEZED;
-		}
+	if (otherFingersPinched) {
+		console.log("squeeze");
+		return HandGestures.SQUEEZED;
+	}
+
+	if (validPinch && !otherFingersPinched && !makingFist) {
+		console.log("pinch");
+		return HandGestures.PINCHED;
 	}
 
 	// still need a differernt gesture for this

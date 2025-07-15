@@ -14,6 +14,12 @@ export type MultiHandLandmark = {
 	z: number;
 };
 
+export type FingerDistance = {
+	fingerTip: MultiHandLandmark;
+	distanceToThumb: number;
+	distanceToBase: number;
+};
+
 export type MultiHandedness = {
 	displayName: string | undefined;
 	index: number;
