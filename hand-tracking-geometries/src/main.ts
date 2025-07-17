@@ -1,39 +1,31 @@
 import * as three from "three";
 import { ThreeCanvas } from "../src/lib/canvas";
 import { MediaPipeHands } from "./lib/media-pipe-hands";
+import {
+	ctxLineSize,
+	digits,
+	HandGestures,
+	objectScaleTick,
+	type MultiHandedness,
+	type MultiHandLandmark,
+	type WebcamResponse,
+} from "./lib/constants";
+import { HandGestureManager } from "./lib/gesture-manager";
 
 const canvas = document.querySelector("canvas.webgl") as HTMLCanvasElement;
 const webcam = document.querySelector("video.webcam") as HTMLVideoElement;
 const canvas2d = document.querySelector(".canvas-2d") as HTMLCanvasElement;
 const ctx = canvas2d.getContext("2d") as CanvasRenderingContext2D;
-const ctxLineSize = 2.5;
 
 if (!canvas) {
 	console.error("Canvas element with class 'webgl' not found.");
 }
 
-const getDimensionsFromElement = (
-	element: HTMLElement,
-	...properties: string[]
-): number[] => {
-	return properties.map((prop) => {
-		const style = getComputedStyle(element).getPropertyValue(prop);
-		// remove "px" from height/width
-		return parseFloat(style.slice(0, -2));
-	});
-};
-// Fix blurry canvas drawn lines
-(function fix_dpr() {
-	const dpr = window.devicePixelRatio || 1;
-	const [height, width] = getDimensionsFromElement(canvas2d, "height", "width");
-	canvas2d.setAttribute("height", (height * dpr).toString());
-	canvas2d.setAttribute("width", (width * dpr).toString());
-})();
-
 const threeCanvas = new ThreeCanvas({ canvas, initShadow: false });
 const {
 	sizes: { width, height },
 	scene,
+	threeCamera: { camera },
 	getNormalizedDeviceCoords,
 } = threeCanvas;
 
@@ -45,16 +37,88 @@ const cube: three.Mesh<three.BoxGeometry, three.MeshBasicMaterial> =
 
 scene.add(cube);
 
-type WebcamResponse = {
-	success: boolean;
-	error?: string | Error;
+const gestures = new HandGestureManager();
+
+const getDimensionsFromElement = (
+	element: HTMLElement,
+	...properties: string[]
+): number[] => {
+	return properties.map((prop) => {
+		const style = getComputedStyle(element).getPropertyValue(prop);
+		// remove "px" from height/width
+		return parseFloat(style.slice(0, -2));
+	});
 };
 
-type MultiHandLandmark = {
-	visibility: unknown;
-	x: number;
-	y: number;
-	z: number;
+// Fix blurry canvas drawn lines
+(function fix_dpr() {
+	const dpr = window.devicePixelRatio || 1;
+	const [height, width] = getDimensionsFromElement(canvas2d, "height", "width");
+	canvas2d.setAttribute("height", (height * dpr).toString());
+	canvas2d.setAttribute("width", (width * dpr).toString());
+})();
+
+const detectHandGesture = (hand: MultiHandLandmark[]): string => {
+	const fingerDistances = gestures.calculateDistancesBetweenFingers(hand);
+
+	const { fingerTip: indexTip, distanceToThumb: indexToThumbDistance } =
+		fingerDistances[0];
+
+	const isHandHoveringOverObject = gestures.isHandHoveringAboveObject({
+		tips: [indexTip],
+		threeObject: cube,
+		camera,
+	});
+
+	if (!isHandHoveringOverObject) return "";
+
+	return gestures.detectGesture({
+		fingerDistances,
+		indexToThumbDistance,
+	});
+};
+
+const scaleObject = (
+	threeObj: three.Mesh,
+	scaleDirection: "up" | "down"
+): void => {
+	// scale down ( negative ) if down direction
+	const scaleStep =
+		scaleDirection === "up" ? objectScaleTick : -objectScaleTick;
+
+	if (threeObj.scale.x >= 0.2 && threeObj.scale.x <= 5) {
+		threeObj.scale.x += scaleStep;
+		threeObj.scale.y += scaleStep;
+		threeObj.scale.z += scaleStep;
+	}
+};
+
+const handleHandGesture = (hand: MultiHandLandmark[]) => {
+	const finger = hand[8];
+
+	// Ok, this is kinda intense but the whole gist of it is we need convert a mediapipe coords to usable threejs coords
+	// mediapipe goes from 0 ( left of screen ) to 1 ( right end of screen )
+	const worldPos = getNormalizedDeviceCoords({
+		x: finger.x,
+		y: finger.y,
+		mirrored: true,
+	});
+
+	switch (detectHandGesture(hand)) {
+		case HandGestures.FIST:
+			break;
+		case HandGestures.PINCHED:
+			scaleObject(cube, "down");
+			break;
+		case HandGestures.UNPINCH:
+			scaleObject(cube, "up");
+			break;
+		case HandGestures.SQUEEZED:
+			cube.position.copy(worldPos);
+			break;
+		default:
+			break;
+	}
 };
 
 const initWebcam = async (): Promise<WebcamResponse> => {
@@ -86,53 +150,16 @@ const initWebcam = async (): Promise<WebcamResponse> => {
 	});
 };
 
-const drawHand = (...hands: MultiHandLandmark[][]): void => {
-	ctx.clearRect(0, 0, canvas2d.width, canvas2d.height);
+const drawHand = (hand: MultiHandLandmark[]): void => {
+	if (!hand) return;
 
-	const digits = [
-		// Thumb
-		[0, 1],
-		[1, 2],
-		[2, 3],
-		[3, 4],
-		// Index finger
-		[0, 5],
-		[5, 6],
-		[6, 7],
-		[7, 8],
-		// Middle finger
-		[0, 9],
-		[9, 10],
-		[10, 11],
-		[11, 12],
-		// Ring finger
-		[0, 13],
-		[13, 14],
-		[14, 15],
-		[15, 16],
-		// Pinky
-		[0, 17],
-		[17, 18],
-		[18, 19],
-		[19, 20],
-		// Palm
-		[0, 5],
-		[5, 9],
-		[9, 13],
-		[13, 17],
-	];
-
-	hands.forEach((hand) => {
-		if (!hand) return;
-
-		digits.forEach(([i, j]) => {
-			const start = hand[i];
-			const end = hand[j];
-			drawHandLine(start, end);
-		});
-
-		drawDigitLandmarks(hand);
+	digits.forEach(([i, j]) => {
+		const start = hand[i];
+		const end = hand[j];
+		drawHandLine(start, end);
 	});
+
+	drawDigitLandmarks(hand);
 };
 
 const drawHandLine = (
@@ -175,23 +202,19 @@ const drawPointOnFinger = (
 	ctx.fill();
 };
 
-const drawHandLandmarks = (multiHandLandmarks: MultiHandLandmark[][]): void => {
+const drawHandLandmarks = (
+	multiHandLandmarks: MultiHandLandmark[][],
+	multiHandedness: MultiHandedness[]
+): void => {
 	// landmarks are 20 points on your hand, with 0 - 5 being where your palm begins and thumb ends split into 5
+
 	if (multiHandLandmarks.length) {
-		const leftHand = multiHandLandmarks[0];
-		const rightHand = multiHandLandmarks[1];
-		drawHand(leftHand, rightHand);
+		ctx.clearRect(0, 0, canvas2d.width, canvas2d.height);
 
-		const finger = leftHand[8];
-
-		// Ok, this is kinda intense but the whole gist of it is we need convert a mediapipe coords to usable threejs coords
-		// mediapipe goes from 0 ( left of screen ) to 1 ( right end of screen )
-		const worldPos = getNormalizedDeviceCoords({
-			x: finger.x,
-			y: finger.y,
-			mirrored: true,
+		multiHandLandmarks.forEach((hand, index) => {
+			drawHand(hand);
+			handleHandGesture(hand);
 		});
-		cube.position.copy(worldPos);
 	}
 };
 
@@ -202,8 +225,13 @@ const drawHandLandmarks = (multiHandLandmarks: MultiHandLandmark[][]): void => {
 			webcam,
 			width,
 			height,
-			({ multiHandLandmarks }: { multiHandLandmarks: MultiHandLandmark[][] }) =>
-				drawHandLandmarks(multiHandLandmarks)
+			({
+				multiHandLandmarks,
+				multiHandedness,
+			}: {
+				multiHandLandmarks: MultiHandLandmark[][];
+				multiHandedness: MultiHandedness[];
+			}) => drawHandLandmarks(multiHandLandmarks, multiHandedness)
 		);
 		hands.start();
 	} catch (e) {

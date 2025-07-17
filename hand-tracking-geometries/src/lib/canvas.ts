@@ -19,6 +19,7 @@ class Sizes {
 class ThreeCamera {
 	camera: three.PerspectiveCamera;
 	sizes: Dimensions;
+
 	constructor(sizes: Sizes) {
 		this.sizes = sizes;
 		this.camera = new three.PerspectiveCamera(
@@ -43,7 +44,7 @@ class ThreeRenderer {
 	constructor(canvas: HTMLCanvasElement, sizes: Sizes) {
 		this.renderer = new three.WebGLRenderer({
 			canvas,
-			// alpha: true,
+			alpha: true, // for transparent background for our stacking z-indexes
 		});
 		this.sizes = sizes;
 		this.renderer.setSize(this.sizes.width, this.sizes.height);
@@ -58,6 +59,7 @@ class ThreeRenderer {
 
 class ThreeControls {
 	controls: OrbitControls;
+
 	constructor(camera: three.PerspectiveCamera, canvas: HTMLCanvasElement) {
 		this.controls = new OrbitControls(camera, canvas);
 		this.controls.enableDamping = true;
@@ -225,7 +227,7 @@ export class ThreeCanvas {
 		const flipMirrorFlag = mirrored ? -1 : 1;
 		const coordX = flipMirrorFlag * (x * 2 - 1);
 		const coordY = flipMirrorFlag * (y * 2 - 1);
-		const normalizedCoordinates = new three.Vector3(coordX, coordY, 0.5);
+		const normalizedCoordinates = new three.Vector3(coordX, coordY, 0);
 
 		// this is the magic trick, it turns the above vector3 to a point according to where the camera sees it
 		normalizedCoordinates.unproject(this.threeCamera.camera);
