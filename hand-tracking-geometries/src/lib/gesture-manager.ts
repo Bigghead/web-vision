@@ -3,8 +3,9 @@ import {
 	HandGestures,
 	pinchDistanceThreshold,
 	type FingerDistance,
-	type MultiHandLandmark,
+	type HandLandmark,
 } from "./constants";
+import type { GLTF } from "three/examples/jsm/Addons.js";
 
 export class HandGestureManager {
 	// the indices of where mediapipe flags as tips or base / start of finger
@@ -12,8 +13,8 @@ export class HandGestureManager {
 	private readonly fingerBasesIndices = [0, 5, 9, 13, 17];
 
 	private calculateTipDistances(
-		tipA: MultiHandLandmark,
-		tipB: MultiHandLandmark
+		tipA: HandLandmark,
+		tipB: HandLandmark
 	): number {
 		const distanceX = tipA.x - tipB.x;
 		const distanceY = tipA.y - tipB.y;
@@ -29,13 +30,13 @@ export class HandGestureManager {
 		threeObject,
 		camera,
 	}: {
-		tips: MultiHandLandmark[];
-		threeObject: three.Mesh;
+		tips: HandLandmark[];
+		threeObject: GLTF;
 		camera: three.Camera;
 	}): boolean => {
 		let allTipsAboveObject = true;
 		const vector = new three.Vector3();
-		vector.copy(threeObject.position);
+		vector.copy(threeObject.scene.position);
 		vector.project(camera);
 
 		// now vector x/y/z are in a range from -1 - 1 ( normalized coordinates )
@@ -59,7 +60,7 @@ export class HandGestureManager {
 	};
 
 	calculateDistancesBetweenFingers = (
-		hand: MultiHandLandmark[]
+		hand: HandLandmark[]
 	): FingerDistance[] => {
 		const fingers = this.fingerTipsIndices.map((tip, index) => ({
 			fingerTip: hand[tip],

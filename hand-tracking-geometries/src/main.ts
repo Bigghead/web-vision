@@ -11,6 +11,7 @@ import {
 	type WebcamResponse,
 } from "./lib/constants";
 import { HandGestureManager } from "./lib/gesture-manager";
+import type { GLTF } from "three/examples/jsm/Addons.js";
 
 const canvas = document.querySelector("canvas.webgl") as HTMLCanvasElement;
 const webcam = document.querySelector("video.webcam") as HTMLVideoElement;
@@ -26,16 +27,19 @@ const {
 	sizes: { width, height },
 	scene,
 	threeCamera: { camera },
+	modelLoader,
 	getNormalizedDeviceCoords,
 } = threeCanvas;
 
-const cube: three.Mesh<three.BoxGeometry, three.MeshBasicMaterial> =
-	new three.Mesh(
-		new three.BoxGeometry(1, 1, 1),
-		new three.MeshBasicMaterial({ color: 0x00ff00, wireframe: true })
-	);
+let threeObject: GLTF[] = [];
 
-scene.add(cube);
+(async function loadModels() {
+	const model = await modelLoader.initModel(
+		"/models/Duck/glTF-Binary/Duck.glb"
+	);
+	threeObject.push(model);
+	scene.add(model.scene);
+})();
 
 const gestures = new HandGestureManager();
 
@@ -58,7 +62,7 @@ const getDimensionsFromElement = (
 	canvas2d.setAttribute("width", (width * dpr).toString());
 })();
 
-const detectHandGesture = (hand: HandLandmark[]): string => {
+const detectHandGesture = (threeObject: GLTF, hand: HandLandmark[]): string => {
 	const fingerDistances = gestures.calculateDistancesBetweenFingers(hand);
 
 	const { fingerTip: indexTip, distanceToThumb: indexToThumbDistance } =
@@ -66,7 +70,7 @@ const detectHandGesture = (hand: HandLandmark[]): string => {
 
 	const isHandHoveringOverObject = gestures.isHandHoveringAboveObject({
 		tips: [indexTip],
-		threeObject: cube,
+		threeObject,
 		camera,
 	});
 
@@ -78,22 +82,22 @@ const detectHandGesture = (hand: HandLandmark[]): string => {
 	});
 };
 
-const scaleObject = (
-	threeObj: three.Mesh,
-	scaleDirection: "up" | "down"
-): void => {
+const scaleObject = (threeObj: GLTF, scaleDirection: "up" | "down"): void => {
 	// scale down ( negative ) if down direction
 	const scaleStep =
 		scaleDirection === "up" ? objectScaleTick : -objectScaleTick;
 
-	if (threeObj.scale.x >= 0.2 && threeObj.scale.x <= 5) {
-		threeObj.scale.x += scaleStep;
-		threeObj.scale.y += scaleStep;
-		threeObj.scale.z += scaleStep;
+	if (threeObj.scene.scale.x >= 0.2 && threeObj.scene.scale.x <= 5) {
+		threeObj.scene.scale.x += scaleStep;
+		threeObj.scene.scale.y += scaleStep;
+		threeObj.scene.scale.z += scaleStep;
 	}
 };
 
-const makeObjectFollowHand = (obj: three.Mesh, hand: HandLandmark[]): void => {
+const makeObjectFollowHand = (
+	threeObject: GLTF,
+	hand: HandLandmark[]
+): void => {
 	const finger = hand[8];
 
 	// Ok, this is kinda intense but the whole gist of it is we need convert a mediapipe coords to usable threejs coords
@@ -103,25 +107,30 @@ const makeObjectFollowHand = (obj: three.Mesh, hand: HandLandmark[]): void => {
 		y: finger.y,
 		mirrored: true,
 	});
-	obj.position.copy(handPos);
+	threeObject.scene.position.copy(handPos);
 };
 
 const handleHandGesture = (hand: HandLandmark[]) => {
-	switch (detectHandGesture(hand)) {
-		case HandGestures.FIST:
-			break;
-		case HandGestures.PINCHED:
-			scaleObject(cube, "down");
-			break;
-		case HandGestures.UNPINCH:
-			scaleObject(cube, "up");
-			break;
-		case HandGestures.SQUEEZED:
-			makeObjectFollowHand(cube, hand);
-			break;
-		default:
-			break;
-	}
+	const models = threeObject;
+	if (!models.length) return;
+
+	models.forEach((model) => {
+		switch (detectHandGesture(model, hand)) {
+			case HandGestures.FIST:
+				break;
+			case HandGestures.PINCHED:
+				scaleObject(model, "down");
+				break;
+			case HandGestures.UNPINCH:
+				scaleObject(model, "up");
+				break;
+			case HandGestures.SQUEEZED:
+				makeObjectFollowHand(model, hand);
+				break;
+			default:
+				break;
+		}
+	});
 };
 
 const initWebcam = async (): Promise<WebcamResponse> => {

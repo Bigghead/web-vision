@@ -1,6 +1,6 @@
 import * as three from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { GLTF, GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { type GLTF, GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 
 type Dimensions = {
@@ -123,10 +123,9 @@ class ThreeModelLoader {
 	loader = new GLTFLoader();
 	dracoLoader = new DRACOLoader();
 
-	constructor(modelSrc: string) {
+	constructor() {
 		this.dracoLoader.setDecoderPath("/loader/draco");
 		this.loader.setDRACOLoader(this.dracoLoader);
-		this.initModel(modelSrc);
 	}
 
 	async initModel(modelSrc: string): Promise<GLTF> {
@@ -134,7 +133,9 @@ class ThreeModelLoader {
 			this.loader.load(
 				modelSrc,
 				(gltf) => resolve(gltf),
-				() => {},
+				(progress) => {
+					console.log(progress);
+				},
 				(e) => {
 					console.error(e);
 					reject(e);
@@ -151,6 +152,7 @@ export class ThreeCanvas {
 	controls: OrbitControls;
 	threeRenderer: ThreeRenderer;
 	lighting: ThreeLighting;
+	modelLoader: ThreeModelLoader;
 
 	scene = new three.Scene();
 	textureLoader = new three.TextureLoader();
@@ -172,6 +174,7 @@ export class ThreeCanvas {
 			renderer: this.threeRenderer.renderer,
 			initShadow,
 		});
+		this.modelLoader = new ThreeModelLoader();
 
 		this.scene.add(
 			this.lighting.ambientLight,
