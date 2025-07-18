@@ -7,7 +7,7 @@ export type WebcamResponse = {
 	error?: string | Error;
 };
 
-export type MultiHandLandmark = {
+export type HandLandmark = {
 	visibility: unknown;
 	x: number;
 	y: number;
@@ -15,7 +15,7 @@ export type MultiHandLandmark = {
 };
 
 export type FingerDistance = {
-	fingerTip: MultiHandLandmark;
+	fingerTip: HandLandmark;
 	distanceToThumb: number;
 	distanceToBase: number;
 };

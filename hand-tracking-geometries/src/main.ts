@@ -4,10 +4,10 @@ import { MediaPipeHands } from "./lib/media-pipe-hands";
 import {
 	ctxLineSize,
 	digits,
-	HandGestures,
 	objectScaleTick,
+	HandGestures,
 	type MultiHandedness,
-	type MultiHandLandmark,
+	type HandLandmark,
 	type WebcamResponse,
 } from "./lib/constants";
 import { HandGestureManager } from "./lib/gesture-manager";
@@ -58,7 +58,7 @@ const getDimensionsFromElement = (
 	canvas2d.setAttribute("width", (width * dpr).toString());
 })();
 
-const detectHandGesture = (hand: MultiHandLandmark[]): string => {
+const detectHandGesture = (hand: HandLandmark[]): string => {
 	const fingerDistances = gestures.calculateDistancesBetweenFingers(hand);
 
 	const { fingerTip: indexTip, distanceToThumb: indexToThumbDistance } =
@@ -93,17 +93,20 @@ const scaleObject = (
 	}
 };
 
-const handleHandGesture = (hand: MultiHandLandmark[]) => {
+const makeObjectFollowHand = (obj: three.Mesh, hand: HandLandmark[]): void => {
 	const finger = hand[8];
 
 	// Ok, this is kinda intense but the whole gist of it is we need convert a mediapipe coords to usable threejs coords
 	// mediapipe goes from 0 ( left of screen ) to 1 ( right end of screen )
-	const worldPos = getNormalizedDeviceCoords({
+	const handPos = getNormalizedDeviceCoords({
 		x: finger.x,
 		y: finger.y,
 		mirrored: true,
 	});
+	obj.position.copy(handPos);
+};
 
+const handleHandGesture = (hand: HandLandmark[]) => {
 	switch (detectHandGesture(hand)) {
 		case HandGestures.FIST:
 			break;
@@ -114,7 +117,7 @@ const handleHandGesture = (hand: MultiHandLandmark[]) => {
 			scaleObject(cube, "up");
 			break;
 		case HandGestures.SQUEEZED:
-			cube.position.copy(worldPos);
+			makeObjectFollowHand(cube, hand);
 			break;
 		default:
 			break;
@@ -150,7 +153,7 @@ const initWebcam = async (): Promise<WebcamResponse> => {
 	});
 };
 
-const drawHand = (hand: MultiHandLandmark[]): void => {
+const drawHand = (hand: HandLandmark[]): void => {
 	if (!hand) return;
 
 	digits.forEach(([i, j]) => {
@@ -162,10 +165,7 @@ const drawHand = (hand: MultiHandLandmark[]): void => {
 	drawDigitLandmarks(hand);
 };
 
-const drawHandLine = (
-	start: MultiHandLandmark,
-	end: MultiHandLandmark
-): void => {
+const drawHandLine = (start: HandLandmark, end: HandLandmark): void => {
 	ctx.lineWidth = ctxLineSize;
 	ctx.beginPath();
 	ctx.moveTo(start.x * canvas2d.width, start.y * canvas2d.height);
@@ -174,14 +174,11 @@ const drawHandLine = (
 	ctx.stroke();
 };
 
-const drawDigitLandmarks = (hand: MultiHandLandmark[]): void => {
+const drawDigitLandmarks = (hand: HandLandmark[]): void => {
 	hand.forEach(drawPointOnFinger);
 };
 
-const drawPointOnFinger = (
-	landmark: MultiHandLandmark,
-	index: number
-): void => {
+const drawPointOnFinger = (landmark: HandLandmark, index: number): void => {
 	let pointColor = "green";
 	const isTip = index === 4 || index === 8;
 
@@ -203,7 +200,7 @@ const drawPointOnFinger = (
 };
 
 const drawHandLandmarks = (
-	multiHandLandmarks: MultiHandLandmark[][],
+	multiHandLandmarks: HandLandmark[][],
 	multiHandedness: MultiHandedness[]
 ): void => {
 	// landmarks are 20 points on your hand, with 0 - 5 being where your palm begins and thumb ends split into 5
@@ -229,7 +226,7 @@ const drawHandLandmarks = (
 				multiHandLandmarks,
 				multiHandedness,
 			}: {
-				multiHandLandmarks: MultiHandLandmark[][];
+				multiHandLandmarks: HandLandmark[][];
 				multiHandedness: MultiHandedness[];
 			}) => drawHandLandmarks(multiHandLandmarks, multiHandedness)
 		);
