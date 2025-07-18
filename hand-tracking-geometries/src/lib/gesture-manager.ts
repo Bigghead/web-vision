@@ -11,7 +11,7 @@ export class HandGestureManager {
 	// the indices of where mediapipe flags as tips or base / start of finger
 	private readonly fingerTipsIndices = [4, 8, 12, 16, 20];
 	private readonly fingerBasesIndices = [0, 5, 9, 13, 17];
-	private readonly indexFingerRotationThreshold = 0.03;
+	private readonly indexFingerRotationThreshold = 0.05;
 
 	private calculateTipDistances(
 		tipA: HandLandmark,
@@ -97,7 +97,7 @@ export class HandGestureManager {
 	// checking if the middle, ring, and pinky fingers are "pinched" towards the thumb.
 	private checkOtherFingersPinched = (fingers: FingerDistance[]): boolean => {
 		return fingers.every((finger) =>
-			this.validPinchDistance(finger.distanceToThumb)
+			this.validPinchDistance(finger.distanceToThumb, 0.04)
 		);
 	};
 
@@ -132,7 +132,7 @@ export class HandGestureManager {
 		indexFinger: Record<string, HandLandmark>;
 	}): string {
 		const makingFist = this.allFingersMakingFist(fingerDistances);
-		const validPinch = this.validPinchDistance(indexToThumbDistance, 0.02);
+		const validPinch = this.validPinchDistance(indexToThumbDistance, 0.03);
 		const otherFingersPinched = this.checkOtherFingersPinched(
 			fingerDistances.slice(1)
 		);

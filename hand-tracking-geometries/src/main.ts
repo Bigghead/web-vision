@@ -9,6 +9,10 @@ import {
 	type MultiHandedness,
 	type HandLandmark,
 	type WebcamResponse,
+	type HandGestureType,
+	type TransformParams,
+	type TransformDirection,
+	type TransformationType,
 } from "./lib/constants";
 import { HandGestureManager } from "./lib/gesture-manager";
 import type { GLTF } from "three/examples/jsm/Addons.js";
@@ -89,8 +93,8 @@ const transformObject = ({
 	transformation,
 }: {
 	threeObj: GLTF;
-	transformDirection: "up" | "down" | "left" | "right";
-	transformation: "scale" | "rotation";
+	transformDirection: TransformDirection;
+	transformation: TransformationType;
 }): void => {
 	// scale down ( negative ) if down direction
 	const scaleStep =
@@ -127,44 +131,51 @@ const makeObjectFollowHand = (
 	threeObject.scene.position.copy(handPos);
 };
 
+// holyyyyyyy, I hate typescript sometimes
+const transformingHandGestures: Partial<
+	Record<HandGestureType, TransformParams>
+> = {
+	[HandGestures.PINCHED]: {
+		transformDirection: "down",
+		transformation: "scale",
+	},
+	[HandGestures.UNPINCH]: {
+		transformDirection: "up",
+		transformation: "scale",
+	},
+	[HandGestures.FINGER_UP_LEFT]: {
+		transformDirection: "left",
+		transformation: "rotation",
+	},
+	[HandGestures.FINGER_UP_RIGHT]: {
+		transformDirection: "right",
+		transformation: "rotation",
+	},
+};
+
 const handleHandGesture = (hand: HandLandmark[]) => {
 	const models = threeObject;
 	if (!models.length) return;
 
 	models.forEach((model) => {
-		switch (detectHandGesture(model, hand)) {
+		const handGesture = detectHandGesture(model, hand);
+
+		if (handGesture in transformingHandGestures) {
+			const { transformDirection, transformation } =
+				transformingHandGestures[handGesture as HandGestureType]!;
+
+			return transformObject({
+				threeObj: model,
+				transformDirection,
+				transformation,
+			});
+		}
+
+		switch (handGesture) {
 			case HandGestures.FIST:
-				break;
-			case HandGestures.PINCHED:
-				transformObject({
-					threeObj: model,
-					transformDirection: "down",
-					transformation: "scale",
-				});
-				break;
-			case HandGestures.UNPINCH:
-				transformObject({
-					threeObj: model,
-					transformDirection: "up",
-					transformation: "scale",
-				});
 				break;
 			case HandGestures.SQUEEZED:
 				makeObjectFollowHand(model, hand);
-				break;
-			case HandGestures.FINGER_UP_LEFT:
-				transformObject({
-					threeObj: model,
-					transformDirection: "left",
-					transformation: "rotation",
-				});
-				break;
-			case HandGestures.FINGER_UP_RIGHT:
-				transformObject({
-					threeObj: model,
-					transformDirection: "right",
-					transformation: "rotation",
-				});
 				break;
 			default:
 				break;
