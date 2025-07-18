@@ -83,15 +83,31 @@ const detectHandGesture = (threeObject: GLTF, hand: HandLandmark[]): string => {
 	});
 };
 
-const scaleObject = (threeObj: GLTF, scaleDirection: "up" | "down"): void => {
+const transformObject = ({
+	threeObj,
+	transformDirection,
+	transformation,
+}: {
+	threeObj: GLTF;
+	transformDirection: "up" | "down" | "left" | "right";
+	transformation: "scale" | "rotation";
+}): void => {
 	// scale down ( negative ) if down direction
 	const scaleStep =
-		scaleDirection === "up" ? objectScaleTick : -objectScaleTick;
+		transformDirection === "up" || transformDirection === "left"
+			? objectScaleTick
+			: -objectScaleTick;
 
-	if (threeObj.scene.scale.x >= 0.2 && threeObj.scene.scale.x <= 5) {
-		threeObj.scene.scale.x += scaleStep;
-		threeObj.scene.scale.y += scaleStep;
-		threeObj.scene.scale.z += scaleStep;
+	if (transformation === "scale") {
+		if (threeObj.scene.scale.x >= 0.2 && threeObj.scene.scale.x <= 5) {
+			threeObj.scene.scale.x += scaleStep;
+			threeObj.scene.scale.y += scaleStep;
+			threeObj.scene.scale.z += scaleStep;
+		}
+	}
+
+	if (transformation === "rotation") {
+		threeObj.scene.rotation.y += scaleStep;
 	}
 };
 
@@ -120,13 +136,35 @@ const handleHandGesture = (hand: HandLandmark[]) => {
 			case HandGestures.FIST:
 				break;
 			case HandGestures.PINCHED:
-				scaleObject(model, "down");
+				transformObject({
+					threeObj: model,
+					transformDirection: "down",
+					transformation: "scale",
+				});
 				break;
 			case HandGestures.UNPINCH:
-				scaleObject(model, "up");
+				transformObject({
+					threeObj: model,
+					transformDirection: "up",
+					transformation: "scale",
+				});
 				break;
 			case HandGestures.SQUEEZED:
 				makeObjectFollowHand(model, hand);
+				break;
+			case HandGestures.FINGER_UP_LEFT:
+				transformObject({
+					threeObj: model,
+					transformDirection: "left",
+					transformation: "rotation",
+				});
+				break;
+			case HandGestures.FINGER_UP_RIGHT:
+				transformObject({
+					threeObj: model,
+					transformDirection: "right",
+					transformation: "rotation",
+				});
 				break;
 			default:
 				break;
