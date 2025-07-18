@@ -79,6 +79,7 @@ const detectHandGesture = (threeObject: GLTF, hand: HandLandmark[]): string => {
 	return gestures.detectGesture({
 		fingerDistances,
 		indexToThumbDistance,
+		indexFinger: { indexTip: hand[8], indexPip: hand[6], indexBase: hand[5] },
 	});
 };
 

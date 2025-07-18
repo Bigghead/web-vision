@@ -11,6 +11,7 @@ export class HandGestureManager {
 	// the indices of where mediapipe flags as tips or base / start of finger
 	private readonly fingerTipsIndices = [4, 8, 12, 16, 20];
 	private readonly fingerBasesIndices = [0, 5, 9, 13, 17];
+	private readonly indexFingerRotationThreshold = 0.03;
 
 	private calculateTipDistances(
 		tipA: HandLandmark,
@@ -21,8 +22,11 @@ export class HandGestureManager {
 		return Math.hypot(distanceX, distanceY);
 	}
 
-	private validPinchDistance(distance: number): boolean {
-		return distance <= pinchDistanceThreshold;
+	private validPinchDistance(
+		distance: number,
+		distanceThreshold = pinchDistanceThreshold
+	): boolean {
+		return distance <= distanceThreshold;
 	}
 
 	isHandHoveringAboveObject = ({
@@ -97,22 +101,52 @@ export class HandGestureManager {
 		);
 	};
 
+	private validateVerticalIndex(
+		indexFinger: Record<string, HandLandmark>
+	): boolean {
+		const { indexTip, indexPip } = indexFinger;
+		const isPointingUp = indexTip.y < indexPip.y - 0.05;
+
+		return isPointingUp;
+	}
+
+	private validateHorizontalIndex(indexFinger: Record<string, HandLandmark>) {
+		const { indexTip, indexBase } = indexFinger;
+
+		if (indexTip.x < indexBase.x - this.indexFingerRotationThreshold) {
+			return HandGestures.FINGER_UP_LEFT;
+		} else if (indexTip.x > indexBase.x + this.indexFingerRotationThreshold) {
+			return HandGestures.FINGER_UP_RIGHT;
+		}
+
+		return "";
+	}
+
 	detectGesture({
 		fingerDistances,
 		indexToThumbDistance,
+		indexFinger,
 	}: {
 		fingerDistances: FingerDistance[];
 		indexToThumbDistance: number;
+		indexFinger: Record<string, HandLandmark>;
 	}): string {
 		const makingFist = this.allFingersMakingFist(fingerDistances);
-		const validPinch = this.validPinchDistance(indexToThumbDistance);
+		const validPinch = this.validPinchDistance(indexToThumbDistance, 0.02);
 		const otherFingersPinched = this.checkOtherFingersPinched(
 			fingerDistances.slice(1)
 		);
 
+		const indexUp = this.validateVerticalIndex(indexFinger);
+
 		if (makingFist) {
 			console.log("fist");
 			return HandGestures.FIST;
+		}
+
+		if (indexUp) {
+			console.log("finger up");
+			return this.validateHorizontalIndex(indexFinger);
 		}
 
 		if (otherFingersPinched) {
