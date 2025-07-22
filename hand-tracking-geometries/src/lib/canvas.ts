@@ -46,7 +46,7 @@ class ThreeRenderer {
 	constructor(canvas: HTMLCanvasElement, sizes: Sizes) {
 		this.renderer = new three.WebGLRenderer({
 			canvas,
-			alpha: true, // for transparent background for our stacking z-indexes
+			alpha: import.meta.env.DEV ? false : true, // for transparent background for our stacking z-indexes
 		});
 		this.sizes = sizes;
 		this.renderer.setSize(this.sizes.width, this.sizes.height);

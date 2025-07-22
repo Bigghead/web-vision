@@ -62,9 +62,9 @@ export class HandGestureManager {
 			const dy = objectY - tip.y;
 			const distance = Math.sqrt(dx * dx + dy * dy);
 
-			// need 0.1 to be a "zone" of where the object is
+			// this distance to be a "zone" of where the object is
 			// but it's ok for now
-			if (distance > 0.1) {
+			if (distance > 0.25) {
 				allTipsAboveObject = false;
 			}
 		});
@@ -103,7 +103,7 @@ export class HandGestureManager {
 	};
 
 	// checking if the middle, ring, and pinky fingers are "pinched" towards the thumb.
-	private checkOtherFingersPinched = (fingers: FingerDistance[]): boolean => {
+	private areOtherFingersPinched = (fingers: FingerDistance[]): boolean => {
 		return fingers.every((finger) =>
 			this.validPinchDistance(finger.distanceToThumb, 0.04)
 		);
@@ -140,7 +140,7 @@ export class HandGestureManager {
 	}): string {
 		const makingFist = this.allFingersMakingFist(fingerDistances);
 		const validPinch = this.validPinchDistance(indexToThumbDistance, 0.025);
-		const otherFingersPinched = this.checkOtherFingersPinched(
+		const otherFingersPinched = this.areOtherFingersPinched(
 			fingerDistances.slice(1)
 		);
 
@@ -161,10 +161,12 @@ export class HandGestureManager {
 			return HandGestures.SQUEEZED;
 		}
 
-		if (validPinch && !otherFingersPinched && !makingFist) {
-			console.log("pinch");
-			return HandGestures.PINCHED;
-		}
+		// We might need two hands for this as the "squeeze" is fighting with a "pinch"
+		// technically same-ish gesture
+		// if (validPinch && !otherFingersPinched && !makingFist) {
+		// 	console.log("pinch");
+		// 	return HandGestures.PINCHED;
+		// }
 
 		// still need a differernt gesture for this
 		// maybe need 2 hands for this one
@@ -194,7 +196,7 @@ export class HandGestureManager {
 			camera,
 		});
 
-		// if (!isHandHoveringOverObject) return "";
+		if (!isHandHoveringOverObject) return "";
 
 		return this.validateGestures({
 			hand,
