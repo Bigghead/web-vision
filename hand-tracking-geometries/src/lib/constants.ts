@@ -1,5 +1,5 @@
 export const ctxLineSize = 2.5;
-export const objectScaleTick = 0.05;
+export const objectScaleTick = 0.025;
 export const pinchDistanceThreshold = 0.08;
 
 export type WebcamResponse = {
@@ -7,7 +7,7 @@ export type WebcamResponse = {
 	error?: string | Error;
 };
 
-export type MultiHandLandmark = {
+export type HandLandmark = {
 	visibility: unknown;
 	x: number;
 	y: number;
@@ -15,7 +15,7 @@ export type MultiHandLandmark = {
 };
 
 export type FingerDistance = {
-	fingerTip: MultiHandLandmark;
+	fingerTip: HandLandmark;
 	distanceToThumb: number;
 	distanceToBase: number;
 };
@@ -36,9 +36,22 @@ export const HandGestures = Object.freeze({
 	SQUEEZED: "squeezed",
 
 	FIST: "fist",
+
 	// rotate
+	FINGER_UP: "finger up",
+	FINGER_UP_LEFT: "finger up left",
+	FINGER_UP_RIGHT: "finger up right",
 	// ....
 });
+
+export type HandGestureType = (typeof HandGestures)[keyof typeof HandGestures];
+
+export type TransformDirection = "down" | "up" | "left" | "right";
+export type TransformationType = "scale" | "rotation";
+export type TransformParams = {
+	transformDirection: TransformDirection;
+	transformation: TransformationType;
+};
 
 export const digits = [
 	// thumb

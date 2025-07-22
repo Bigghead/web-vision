@@ -1,5 +1,7 @@
 import * as three from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { type GLTF, GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 
 type Dimensions = {
 	width: number;
@@ -44,7 +46,7 @@ class ThreeRenderer {
 	constructor(canvas: HTMLCanvasElement, sizes: Sizes) {
 		this.renderer = new three.WebGLRenderer({
 			canvas,
-			alpha: true, // for transparent background for our stacking z-indexes
+			alpha: import.meta.env.DEV ? false : true, // for transparent background for our stacking z-indexes
 		});
 		this.sizes = sizes;
 		this.renderer.setSize(this.sizes.width, this.sizes.height);
@@ -117,6 +119,32 @@ class ThreeLighting {
 	};
 }
 
+class ThreeModelLoader {
+	loader = new GLTFLoader();
+	dracoLoader = new DRACOLoader();
+
+	constructor() {
+		this.dracoLoader.setDecoderPath("/loader/draco");
+		this.loader.setDRACOLoader(this.dracoLoader);
+	}
+
+	async initModel(modelSrc: string): Promise<GLTF> {
+		return new Promise((resolve, reject) => {
+			this.loader.load(
+				modelSrc,
+				(gltf) => resolve(gltf),
+				(progress) => {
+					console.log(progress);
+				},
+				(e) => {
+					console.error(e);
+					reject(e);
+				}
+			);
+		});
+	}
+}
+
 export class ThreeCanvas {
 	cursor = { x: 0, y: 0 };
 	sizes: Sizes;
@@ -124,6 +152,7 @@ export class ThreeCanvas {
 	controls: OrbitControls;
 	threeRenderer: ThreeRenderer;
 	lighting: ThreeLighting;
+	modelLoader: ThreeModelLoader;
 
 	scene = new three.Scene();
 	textureLoader = new three.TextureLoader();
@@ -145,6 +174,7 @@ export class ThreeCanvas {
 			renderer: this.threeRenderer.renderer,
 			initShadow,
 		});
+		this.modelLoader = new ThreeModelLoader();
 
 		this.scene.add(
 			this.lighting.ambientLight,
