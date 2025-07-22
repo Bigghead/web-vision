@@ -66,25 +66,8 @@ const getDimensionsFromElement = (
 	canvas2d.setAttribute("width", (width * dpr).toString());
 })();
 
-const detectHandGesture = (threeObject: GLTF, hand: HandLandmark[]): string => {
-	const fingerDistances = gestures.calculateDistancesBetweenFingers(hand);
-
-	const { fingerTip: indexTip, distanceToThumb: indexToThumbDistance } =
-		fingerDistances[0];
-
-	const isHandHoveringOverObject = gestures.isHandHoveringAboveObject({
-		tips: [indexTip],
-		threeObject,
-		camera,
-	});
-
-	if (!isHandHoveringOverObject) return "";
-
-	return gestures.detectGesture({
-		fingerDistances,
-		indexToThumbDistance,
-		indexFinger: { indexTip: hand[8], indexPip: hand[6], indexBase: hand[5] },
-	});
+const detectHandGesture = (hand: HandLandmark[], threeObject: GLTF): string => {
+	return gestures.detectGesture(hand, threeObject, camera);
 };
 
 const transformObject = ({
@@ -158,7 +141,7 @@ const handleHandGesture = (hand: HandLandmark[]) => {
 	if (!models.length) return;
 
 	models.forEach((model) => {
-		const handGesture = detectHandGesture(model, hand);
+		const handGesture = detectHandGesture(hand, model);
 
 		if (handGesture in transformingHandGestures) {
 			const { transformDirection, transformation } =

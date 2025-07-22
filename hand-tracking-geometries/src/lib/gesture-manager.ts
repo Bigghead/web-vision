@@ -7,6 +7,14 @@ import {
 } from "./constants";
 import type { GLTF } from "three/examples/jsm/Addons.js";
 
+/**
+ * You know, this could probably be done muuuuuch easier if we used a built-in / external gesture detector
+ * I think mediapipe even has one but:
+ * 1) Yolo
+ * 2) It's more fun getting broken things to work
+ * 3) Now we know how it works
+ *
+ */
 export class HandGestureManager {
 	// the indices of where mediapipe flags as tips or base / start of finger
 	private readonly fingerTipsIndices = [4, 8, 12, 16, 20];
@@ -101,52 +109,51 @@ export class HandGestureManager {
 		);
 	};
 
-	private validateVerticalIndex(
-		indexFinger: Record<string, HandLandmark>
-	): boolean {
-		const { indexTip, indexPip } = indexFinger;
-		const isPointingUp = indexTip.y < indexPip.y - 0.05;
+	private validateIndexFinger(hand: HandLandmark[]) {
+		const indexTip = hand[8];
+		const indexPip = hand[6];
+		const indexBase = hand[5];
 
-		return isPointingUp;
-	}
-
-	private validateHorizontalIndex(indexFinger: Record<string, HandLandmark>) {
-		const { indexTip, indexBase } = indexFinger;
+		const indexPointingUp = indexTip.y < indexPip.y - 0.05;
+		let gesture = "";
 
 		if (indexTip.x < indexBase.x - this.indexFingerRotationThreshold) {
-			return HandGestures.FINGER_UP_LEFT;
+			gesture = HandGestures.FINGER_UP_LEFT;
 		} else if (indexTip.x > indexBase.x + this.indexFingerRotationThreshold) {
-			return HandGestures.FINGER_UP_RIGHT;
+			gesture = HandGestures.FINGER_UP_RIGHT;
 		}
 
-		return "";
+		return {
+			indexPointingUp,
+			gesture,
+		};
 	}
 
-	detectGesture({
+	private validateGestures({
+		hand,
 		fingerDistances,
 		indexToThumbDistance,
-		indexFinger,
 	}: {
+		hand: HandLandmark[];
 		fingerDistances: FingerDistance[];
 		indexToThumbDistance: number;
-		indexFinger: Record<string, HandLandmark>;
 	}): string {
 		const makingFist = this.allFingersMakingFist(fingerDistances);
-		const validPinch = this.validPinchDistance(indexToThumbDistance, 0.03);
+		const validPinch = this.validPinchDistance(indexToThumbDistance, 0.025);
 		const otherFingersPinched = this.checkOtherFingersPinched(
 			fingerDistances.slice(1)
 		);
 
-		const indexUp = this.validateVerticalIndex(indexFinger);
+		const { indexPointingUp, gesture } = this.validateIndexFinger(hand);
 
 		if (makingFist) {
 			console.log("fist");
 			return HandGestures.FIST;
 		}
 
-		if (indexUp) {
+		if (indexPointingUp) {
 			console.log("finger up");
-			return this.validateHorizontalIndex(indexFinger);
+			return gesture;
 		}
 
 		if (otherFingersPinched) {
@@ -169,5 +176,30 @@ export class HandGestureManager {
 		// }
 
 		return "";
+	}
+
+	detectGesture(
+		hand: HandLandmark[],
+		threeObject: GLTF,
+		camera: three.PerspectiveCamera
+	): string {
+		const fingerDistances = this.calculateDistancesBetweenFingers(hand);
+
+		const { fingerTip: indexTip, distanceToThumb: indexToThumbDistance } =
+			fingerDistances[0];
+
+		const isHandHoveringOverObject = this.isHandHoveringAboveObject({
+			tips: [indexTip],
+			threeObject,
+			camera,
+		});
+
+		// if (!isHandHoveringOverObject) return "";
+
+		return this.validateGestures({
+			hand,
+			fingerDistances,
+			indexToThumbDistance,
+		});
 	}
 }
