@@ -34,11 +34,13 @@ body {
 	-webkit-transform: scaleX(-1);
 }
 
-.webcam {
-	z-index: 1;
-}
 .webgl {
 	background-color: transparent;
+	z-index: 1;
+}
+.webcam {
+	height: 200px;
+	width: 300px;
 	z-index: 2;
 }
 .canvas-2d {

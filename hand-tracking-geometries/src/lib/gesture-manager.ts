@@ -12,7 +12,8 @@ import type { GLTF } from "three/examples/jsm/Addons.js";
  * I think mediapipe even has one but:
  * 1) Yolo
  * 2) It's more fun getting broken things to work
- * 3) Now we know how it works
+ * 3) Now we know how it works, but it's pretty annoying to get right
+ *
  *
  */
 export class HandGestureManager {
@@ -37,7 +38,7 @@ export class HandGestureManager {
 		return distance <= distanceThreshold;
 	}
 
-	isHandHoveringAboveObject = ({
+	private isHandHoveringAboveObject = ({
 		tips,
 		threeObject,
 		camera,
@@ -71,7 +72,7 @@ export class HandGestureManager {
 		return allTipsAboveObject;
 	};
 
-	calculateDistancesBetweenFingers = (
+	private calculateDistancesBetweenFingers = (
 		hand: HandLandmark[]
 	): FingerDistance[] => {
 		const fingers = this.fingerTipsIndices.map((tip, index) => ({
@@ -138,28 +139,30 @@ export class HandGestureManager {
 		fingerDistances: FingerDistance[];
 		indexToThumbDistance: number;
 	}): string {
-		const makingFist = this.allFingersMakingFist(fingerDistances);
-		const validPinch = this.validPinchDistance(indexToThumbDistance, 0.025);
+		// const makingFist = this.allFingersMakingFist(fingerDistances);
+
+		// Todo, need a diff way of detecting a pinch in / out for scale
+		// const validPinch = this.validPinchDistance(indexToThumbDistance, 0.025);
 		const otherFingersPinched = this.areOtherFingersPinched(
 			fingerDistances.slice(1)
 		);
 
-		const { indexPointingUp, gesture } = this.validateIndexFinger(hand);
-
-		if (makingFist) {
-			console.log("fist");
-			return HandGestures.FIST;
-		}
-
-		if (indexPointingUp) {
-			console.log("finger up");
-			return gesture;
-		}
+		// const { indexPointingUp, gesture } = this.validateIndexFinger(hand);
 
 		if (otherFingersPinched) {
 			console.log("squeeze");
 			return HandGestures.SQUEEZED;
 		}
+
+		// if (makingFist) {
+		// 	console.log("fist");
+		// 	return HandGestures.FIST;
+		// }
+
+		// if (indexPointingUp) {
+		// 	console.log("finger up");
+		// 	return gesture;
+		// }
 
 		// We might need two hands for this as the "squeeze" is fighting with a "pinch"
 		// technically same-ish gesture
