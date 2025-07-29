@@ -1,11 +1,10 @@
 import * as three from "three";
+import { HandGestures, pinchDistanceThreshold } from "./constants";
 import {
-	HandGestures,
-	pinchDistanceThreshold,
 	type FingerDistance,
 	type GestureResponse,
 	type HandLandmark,
-} from "./constants";
+} from "./types";
 import type { GLTF } from "three/examples/jsm/Addons.js";
 
 /**
@@ -184,11 +183,15 @@ export class HandGestureManager {
 		return gestureResponse;
 	}
 
-	detectGesture(
-		hand: HandLandmark[],
-		threeObject: GLTF,
-		camera: three.PerspectiveCamera
-	): GestureResponse {
+	detectGesture({
+		hand,
+		threeObject,
+		camera,
+	}: {
+		hand: HandLandmark[];
+		threeObject: GLTF;
+		camera: three.PerspectiveCamera;
+	}): GestureResponse {
 		const fingerDistances = this.calculateDistancesBetweenFingers(hand);
 
 		const { fingerTip: indexTip, distanceToThumb: indexToThumbDistance } =

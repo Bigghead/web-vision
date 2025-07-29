@@ -5,13 +5,15 @@ import {
 	digits,
 	objectScaleTick,
 	HandGestures,
+} from "./lib/constants";
+import {
 	type MultiHandedness,
 	type HandLandmark,
 	type WebcamResponse,
 	type TransformDirection,
 	type TransformationType,
 	type GestureResponse,
-} from "./lib/constants";
+} from "./lib/types";
 import { HandGestureManager } from "./lib/gesture-manager";
 import type { GLTF } from "three/examples/jsm/Addons.js";
 
@@ -68,7 +70,7 @@ const detectHandGesture = (
 	hand: HandLandmark[],
 	threeObject: GLTF
 ): GestureResponse => {
-	return gestures.detectGesture(hand, threeObject, camera);
+	return gestures.detectGesture({ hand, threeObject, camera });
 };
 
 const transformObject = ({
