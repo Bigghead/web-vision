@@ -1,4 +1,3 @@
-import * as three from "three";
 import { ThreeCanvas } from "../src/lib/canvas";
 import { MediaPipeHands } from "./lib/media-pipe-hands";
 import {
@@ -6,14 +5,15 @@ import {
 	digits,
 	objectScaleTick,
 	HandGestures,
+} from "./lib/constants";
+import {
 	type MultiHandedness,
 	type HandLandmark,
 	type WebcamResponse,
-	type HandGestureType,
-	type TransformParams,
 	type TransformDirection,
 	type TransformationType,
-} from "./lib/constants";
+	type GestureResponse,
+} from "./lib/types";
 import { HandGestureManager } from "./lib/gesture-manager";
 import type { GLTF } from "three/examples/jsm/Addons.js";
 
@@ -66,8 +66,11 @@ const getDimensionsFromElement = (
 	canvas2d.setAttribute("width", (width * dpr).toString());
 })();
 
-const detectHandGesture = (hand: HandLandmark[], threeObject: GLTF): string => {
-	return gestures.detectGesture(hand, threeObject, camera);
+const detectHandGesture = (
+	hand: HandLandmark[],
+	threeObject: GLTF
+): GestureResponse => {
+	return gestures.detectGesture({ hand, threeObject, camera });
 };
 
 const transformObject = ({
@@ -102,7 +105,7 @@ const makeObjectFollowHand = (
 	threeObject: GLTF,
 	hand: HandLandmark[]
 ): void => {
-	const finger = hand[8];
+	const finger = hand[12];
 
 	// Ok, this is kinda intense but the whole gist of it is we need convert a mediapipe coords to usable threejs coords
 	// mediapipe goes from 0 ( left of screen ) to 1 ( right end of screen )
@@ -114,51 +117,27 @@ const makeObjectFollowHand = (
 	threeObject.scene.position.copy(handPos);
 };
 
-// holyyyyyyy, I hate typescript sometimes
-const transformingHandGestures: Partial<
-	Record<HandGestureType, TransformParams>
-> = {
-	[HandGestures.PINCHED]: {
-		transformDirection: "down",
-		transformation: "scale",
-	},
-	[HandGestures.UNPINCH]: {
-		transformDirection: "up",
-		transformation: "scale",
-	},
-	[HandGestures.FINGER_UP_LEFT]: {
-		transformDirection: "left",
-		transformation: "rotation",
-	},
-	[HandGestures.FINGER_UP_RIGHT]: {
-		transformDirection: "right",
-		transformation: "rotation",
-	},
-};
-
-const handleHandGesture = (hand: HandLandmark[]) => {
+const handleHandGesture = (
+	hand: HandLandmark[],
+	handLabel: "Right" | "Left"
+) => {
 	const models = threeObject;
 	if (!models.length) return;
 
 	models.forEach((model) => {
-		const handGesture = detectHandGesture(hand, model);
+		const { gesture, data } = detectHandGesture(hand, model);
 
-		if (handGesture in transformingHandGestures) {
-			const { transformDirection, transformation } =
-				transformingHandGestures[handGesture as HandGestureType]!;
-
-			return transformObject({
-				threeObj: model,
-				transformDirection,
-				transformation,
-			});
-		}
-
-		switch (handGesture) {
+		switch (gesture) {
 			case HandGestures.FIST:
+				makeObjectFollowHand(model, hand);
 				break;
 			case HandGestures.SQUEEZED:
-				makeObjectFollowHand(model, hand);
+				break;
+			case HandGestures.PINCHED:
+				if (data && typeof data === "number") {
+					const rotationY = handLabel === "Right" ? -data : data;
+					model.scene.rotation.y += rotationY;
+				}
 				break;
 			default:
 				break;
@@ -251,8 +230,10 @@ const drawHandLandmarks = (
 		ctx.clearRect(0, 0, canvas2d.width, canvas2d.height);
 
 		multiHandLandmarks.forEach((hand, index) => {
+			const handLabel = multiHandedness[index]?.label;
+			console.log(handLabel);
 			drawHand(hand);
-			handleHandGesture(hand);
+			handleHandGesture(hand, handLabel);
 		});
 	}
 };

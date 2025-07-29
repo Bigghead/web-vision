@@ -46,7 +46,7 @@ class ThreeRenderer {
 	constructor(canvas: HTMLCanvasElement, sizes: Sizes) {
 		this.renderer = new three.WebGLRenderer({
 			canvas,
-			alpha: import.meta.env.DEV ? false : true, // for transparent background for our stacking z-indexes
+			alpha: true, // for transparent background for our stacking z-indexes
 		});
 		this.sizes = sizes;
 		this.renderer.setSize(this.sizes.width, this.sizes.height);
@@ -181,6 +181,8 @@ export class ThreeCanvas {
 			this.lighting.directionalLight,
 			this.threeCamera.camera
 		);
+
+		this.scene.background = new three.Color("#ccd5c4");
 
 		// Add event listeners (important for functionality)
 		window.addEventListener("resize", this.resizeCanvas);
