@@ -39,25 +39,35 @@ export class HandGestureManager {
 		return distance <= distanceThreshold;
 	}
 
-	private isHandHoveringAboveObject = ({
-		tips,
-		threeObject,
-		camera,
-	}: {
-		tips: HandLandmark[];
-		threeObject: GLTF;
-		camera: three.Camera;
-	}): boolean => {
-		let allTipsAboveObject = true;
+	// Converts threejs coordinates into normalized mediapipe coords
+	private getNormalizedObjectPosition(
+		threeObject: GLTF,
+		camera: three.PerspectiveCamera
+	) {
 		const vector = new three.Vector3();
 		vector.copy(threeObject.scene.position);
 		vector.project(camera);
-
 		// now vector x/y/z are in a range from -1 - 1 ( normalized coordinates )
 		// we need to convert to mediapipe coordinates ( from 0 to 1 )
 
 		const objectX = (vector.x + 1) / 2;
 		const objectY = (1 - vector.y) / 2;
+
+		return {
+			objectX,
+			objectY,
+		};
+	}
+
+	private isHandHoveringAboveObject = ({
+		tips,
+		position,
+	}: {
+		tips: HandLandmark[];
+		position: Record<string, number>;
+	}): boolean => {
+		let allTipsAboveObject = true;
+		const { objectX, objectY } = position;
 
 		tips.forEach((tip) => {
 			const dx = objectX - (1 - tip.x);
@@ -109,26 +119,6 @@ export class HandGestureManager {
 		);
 	};
 
-	private validateIndexFinger(hand: HandLandmark[]) {
-		const indexTip = hand[8];
-		const indexPip = hand[6];
-		const indexBase = hand[5];
-
-		const indexPointingUp = indexTip.y < indexPip.y - 0.05;
-		let gesture = "";
-
-		if (indexTip.x < indexBase.x - this.indexFingerRotationThreshold) {
-			gesture = HandGestures.FINGER_UP_LEFT;
-		} else if (indexTip.x > indexBase.x + this.indexFingerRotationThreshold) {
-			gesture = HandGestures.FINGER_UP_RIGHT;
-		}
-
-		return {
-			indexPointingUp,
-			gesture,
-		};
-	}
-
 	private validateGestures({
 		hand,
 		fingerDistances,
@@ -146,7 +136,6 @@ export class HandGestureManager {
 		const validPinch = this.validPinchDistance(indexToThumbDistance, 0.025);
 		const nonThumbFingers = fingerDistances.slice(1);
 		const makingFist = this.allFingersMakingFist(nonThumbFingers);
-		// const { indexPointingUp, gesture } = this.validateIndexFinger(hand);
 
 		// Todo, need a diff way of detecting a pinch in / out for scale
 
@@ -175,11 +164,6 @@ export class HandGestureManager {
 			gestureResponse.gesture = HandGestures.FIST;
 			return gestureResponse;
 		}
-
-		// if (indexPointingUp) {
-		// 	console.log("finger up");
-		// 	return gesture;
-		// }
 
 		// We might need two hands for this as the "squeeze" is fighting with a "pinch"
 		// technically same-ish gesture
@@ -210,10 +194,14 @@ export class HandGestureManager {
 		const { fingerTip: indexTip, distanceToThumb: indexToThumbDistance } =
 			fingerDistances[1];
 
+		const normalizedThreeObjectCoords = this.getNormalizedObjectPosition(
+			threeObject,
+			camera
+		);
+
 		const isHandHoveringOverObject = this.isHandHoveringAboveObject({
 			tips: [indexTip],
-			threeObject,
-			camera,
+			position: normalizedThreeObjectCoords,
 		});
 
 		if (!isHandHoveringOverObject) return { gesture: "" };

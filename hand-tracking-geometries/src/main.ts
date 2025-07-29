@@ -1,4 +1,3 @@
-import * as three from "three";
 import { ThreeCanvas } from "../src/lib/canvas";
 import { MediaPipeHands } from "./lib/media-pipe-hands";
 import {
