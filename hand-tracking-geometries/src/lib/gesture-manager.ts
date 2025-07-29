@@ -3,6 +3,7 @@ import {
 	HandGestures,
 	pinchDistanceThreshold,
 	type FingerDistance,
+	type GestureResponse,
 	type HandLandmark,
 } from "./constants";
 import type { GLTF } from "three/examples/jsm/Addons.js";
@@ -83,17 +84,15 @@ export class HandGestureManager {
 		const thumbTip = fingers[0].fingerTip;
 
 		// remove thumb from result cause we only care about calculated distance from thumb or other bases
-		const nonThumbFingerDistances = fingers
-			.slice(1)
-			.map(({ fingerTip, fingerBase }) => {
-				return {
-					fingerTip,
-					distanceToThumb: this.calculateTipDistances(thumbTip, fingerTip),
-					distanceToBase: this.calculateTipDistances(fingerTip, fingerBase),
-				};
-			});
+		const fingerDistances = fingers.map(({ fingerTip, fingerBase }) => {
+			return {
+				fingerTip,
+				distanceToThumb: this.calculateTipDistances(thumbTip, fingerTip),
+				distanceToBase: this.calculateTipDistances(fingerTip, fingerBase),
+			};
+		});
 
-		return nonThumbFingerDistances;
+		return fingerDistances;
 	};
 
 	// checking if all non-thumb fingers are curled into a fist.
@@ -138,26 +137,46 @@ export class HandGestureManager {
 		hand: HandLandmark[];
 		fingerDistances: FingerDistance[];
 		indexToThumbDistance: number;
-	}): string {
-		// const makingFist = this.allFingersMakingFist(fingerDistances);
+	}): GestureResponse {
+		const gestureResponse: GestureResponse = {
+			gesture: "",
+			data: null,
+		};
+
+		const nonThumbFingers = fingerDistances.slice(1);
+		const makingFist = this.allFingersMakingFist(nonThumbFingers);
 
 		// Todo, need a diff way of detecting a pinch in / out for scale
-		// const validPinch = this.validPinchDistance(indexToThumbDistance, 0.025);
-		const otherFingersPinched = this.areOtherFingersPinched(
-			fingerDistances.slice(1)
-		);
+		const validPinch = this.validPinchDistance(indexToThumbDistance, 0.025);
+		const otherFingersPinched = this.areOtherFingersPinched(nonThumbFingers);
+
+		const thumbTip = fingerDistances[0]?.fingerTip.x;
+		const indexTip = fingerDistances[1]?.fingerTip.x;
+
+		if (validPinch && !makingFist) {
+			console.log("pinch");
+			const currentPinch = (thumbTip + indexTip) / 2;
+			const deltaX = currentPinch;
+
+			gestureResponse.gesture = HandGestures.PINCHED;
+			gestureResponse.data = deltaX / 10;
+
+			return gestureResponse;
+		}
 
 		// const { indexPointingUp, gesture } = this.validateIndexFinger(hand);
 
-		if (otherFingersPinched) {
-			console.log("squeeze");
-			return HandGestures.SQUEEZED;
-		}
-
-		// if (makingFist) {
-		// 	console.log("fist");
-		// 	return HandGestures.FIST;
+		// if (otherFingersPinched) {
+		// 	console.log("squeeze");
+		// 	gestureResponse.gesture = HandGestures.SQUEEZED;
+		// 	return gestureResponse;
 		// }
+
+		if (makingFist) {
+			console.log("fist");
+			gestureResponse.gesture = HandGestures.FIST;
+			return gestureResponse;
+		}
 
 		// if (indexPointingUp) {
 		// 	console.log("finger up");
@@ -180,18 +199,18 @@ export class HandGestureManager {
 		// 	}
 		// }
 
-		return "";
+		return gestureResponse;
 	}
 
 	detectGesture(
 		hand: HandLandmark[],
 		threeObject: GLTF,
 		camera: three.PerspectiveCamera
-	): string {
+	): GestureResponse {
 		const fingerDistances = this.calculateDistancesBetweenFingers(hand);
 
 		const { fingerTip: indexTip, distanceToThumb: indexToThumbDistance } =
-			fingerDistances[0];
+			fingerDistances[1];
 
 		const isHandHoveringOverObject = this.isHandHoveringAboveObject({
 			tips: [indexTip],
@@ -199,12 +218,13 @@ export class HandGestureManager {
 			camera,
 		});
 
-		if (!isHandHoveringOverObject) return "";
+		if (!isHandHoveringOverObject) return { gesture: "" };
 
 		return this.validateGestures({
 			hand,
 			fingerDistances,
 			indexToThumbDistance,
+			threeObject,
 		});
 	}
 }
