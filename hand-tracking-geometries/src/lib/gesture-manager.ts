@@ -143,12 +143,12 @@ export class HandGestureManager {
 			data: null,
 		};
 
+		const validPinch = this.validPinchDistance(indexToThumbDistance, 0.025);
 		const nonThumbFingers = fingerDistances.slice(1);
 		const makingFist = this.allFingersMakingFist(nonThumbFingers);
+		// const { indexPointingUp, gesture } = this.validateIndexFinger(hand);
 
 		// Todo, need a diff way of detecting a pinch in / out for scale
-		const validPinch = this.validPinchDistance(indexToThumbDistance, 0.025);
-		const otherFingersPinched = this.areOtherFingersPinched(nonThumbFingers);
 
 		const thumbTip = fingerDistances[0]?.fingerTip.x;
 		const indexTip = fingerDistances[1]?.fingerTip.x;
@@ -163,8 +163,6 @@ export class HandGestureManager {
 
 			return gestureResponse;
 		}
-
-		// const { indexPointingUp, gesture } = this.validateIndexFinger(hand);
 
 		// if (otherFingersPinched) {
 		// 	console.log("squeeze");
@@ -224,7 +222,6 @@ export class HandGestureManager {
 			hand,
 			fingerDistances,
 			indexToThumbDistance,
-			threeObject,
 		});
 	}
 }

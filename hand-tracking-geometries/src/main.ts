@@ -9,8 +9,6 @@ import {
 	type MultiHandedness,
 	type HandLandmark,
 	type WebcamResponse,
-	type HandGestureType,
-	type TransformParams,
 	type TransformDirection,
 	type TransformationType,
 	type GestureResponse,
@@ -118,28 +116,6 @@ const makeObjectFollowHand = (
 	threeObject.scene.position.copy(handPos);
 };
 
-// holyyyyyyy, I hate typescript sometimes
-const transformingHandGestures: Partial<
-	Record<HandGestureType, TransformParams>
-> = {
-	[HandGestures.PINCHED]: {
-		transformDirection: "down",
-		transformation: "scale",
-	},
-	[HandGestures.UNPINCH]: {
-		transformDirection: "up",
-		transformation: "scale",
-	},
-	[HandGestures.FINGER_UP_LEFT]: {
-		transformDirection: "left",
-		transformation: "rotation",
-	},
-	[HandGestures.FINGER_UP_RIGHT]: {
-		transformDirection: "right",
-		transformation: "rotation",
-	},
-};
-
 const handleHandGesture = (
 	hand: HandLandmark[],
 	handLabel: "Right" | "Left"
@@ -149,17 +125,6 @@ const handleHandGesture = (
 
 	models.forEach((model) => {
 		const { gesture, data } = detectHandGesture(hand, model);
-
-		// if (handGesture in transformingHandGestures) {
-		// 	const { transformDirection, transformation } =
-		// 		transformingHandGestures[handGesture as HandGestureType]!;
-
-		// 	return transformObject({
-		// 		threeObj: model,
-		// 		transformDirection,
-		// 		transformation,
-		// 	});
-		// }
 
 		switch (gesture) {
 			case HandGestures.FIST:
