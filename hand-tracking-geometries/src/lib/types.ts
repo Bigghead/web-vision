@@ -12,6 +12,8 @@ export type HandLandmark = {
 	z: number;
 };
 
+export type HandLabel = "Right" | "Left";
+
 export type FingerDistance = {
 	fingerTip: HandLandmark;
 	distanceToThumb: number;

@@ -13,6 +13,7 @@ import {
 	type TransformDirection,
 	type TransformationType,
 	type GestureResponse,
+	type HandLabel,
 } from "./lib/types";
 import { HandGestureManager } from "./lib/gesture-manager";
 import type { GLTF } from "three/examples/jsm/Addons.js";
@@ -66,11 +67,16 @@ const getDimensionsFromElement = (
 	canvas2d.setAttribute("width", (width * dpr).toString());
 })();
 
-const detectHandGesture = (
-	hand: HandLandmark[],
-	threeObject: GLTF
-): GestureResponse => {
-	return gestures.detectGesture({ hand, threeObject, camera });
+const detectHandGesture = ({
+	hand,
+	threeObject,
+	handLabel,
+}: {
+	hand: HandLandmark[];
+	threeObject: GLTF;
+	handLabel: HandLabel;
+}): GestureResponse => {
+	return gestures.detectGesture({ hand, threeObject, camera, handLabel });
 };
 
 const transformObject = ({
@@ -117,15 +123,16 @@ const makeObjectFollowHand = (
 	threeObject.scene.position.copy(handPos);
 };
 
-const handleHandGesture = (
-	hand: HandLandmark[],
-	handLabel: "Right" | "Left"
-) => {
+const handleHandGesture = (hand: HandLandmark[], handLabel: HandLabel) => {
 	const models = threeObject;
 	if (!models.length) return;
 
 	models.forEach((model) => {
-		const { gesture, data } = detectHandGesture(hand, model);
+		const { gesture, data } = detectHandGesture({
+			hand,
+			threeObject: model,
+			handLabel,
+		});
 
 		switch (gesture) {
 			case HandGestures.FIST:

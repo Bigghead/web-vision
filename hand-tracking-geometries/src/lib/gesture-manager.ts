@@ -3,6 +3,7 @@ import { HandGestures, pinchDistanceThreshold } from "./constants";
 import {
 	type FingerDistance,
 	type GestureResponse,
+	type HandLabel,
 	type HandLandmark,
 } from "./types";
 import type { GLTF } from "three/examples/jsm/Addons.js";
@@ -27,6 +28,11 @@ export class HandGestureManager {
 	private readonly fingerTipsIndices = [4, 8, 12, 16, 20];
 	private readonly fingerBasesIndices = [0, 5, 9, 13, 17];
 	private readonly indexFingerRotationThreshold = 0.05;
+
+	private pinchedHands: Map<string, boolean> = new Map([
+		["Left", false],
+		["Right", false],
+	]);
 
 	private calculateTipDistances(
 		tipA: HandLandmark,
@@ -69,7 +75,7 @@ export class HandGestureManager {
 		position,
 	}: {
 		tips: HandLandmark[];
-		position: Record<string, number>;
+		position: NormalizedCoords;
 	}): boolean => {
 		let allTipsAboveObject = true;
 		const { objectX, objectY } = position;
@@ -124,13 +130,26 @@ export class HandGestureManager {
 		);
 	};
 
+	private resetPinchedHands(): void {
+		this.pinchedHands.forEach((_, key) => this.pinchedHands.set(key, false));
+	}
+
+	private bothHandsPinched(): boolean {
+		return (
+			this.pinchedHands.get("Left") === true &&
+			this.pinchedHands.get("Right") === true
+		);
+	}
+
 	private validateGestures({
 		hand,
+		handLabel,
 		fingerDistances,
 		indexToThumbDistance,
 		threeObjectPosition,
 	}: {
 		hand: HandLandmark[];
+		handLabel: HandLabel;
 		fingerDistances: FingerDistance[];
 		indexToThumbDistance: number;
 		threeObjectPosition: NormalizedCoords;
@@ -150,8 +169,17 @@ export class HandGestureManager {
 		const thumbTip = fingerDistances[0]?.fingerTip.x;
 		const indexTip = fingerDistances[1]?.fingerTip.x;
 
+		// this.resetPinchedHands();
 		if (validPinch && !makingFist) {
 			console.log("pinch");
+			this.pinchedHands.set(handLabel, true);
+
+			if (this.bothHandsPinched()) {
+				console.log("both pinched");
+				this.resetPinchedHands();
+				return gestureResponse;
+			}
+
 			const currentPinch = (thumbTip + indexTip) / 2;
 			const { objectX } = threeObjectPosition;
 
@@ -160,6 +188,7 @@ export class HandGestureManager {
 
 			gestureResponse.gesture = HandGestures.PINCHED;
 			gestureResponse.data = deltaX / 20;
+
 			return gestureResponse;
 		}
 
@@ -198,10 +227,12 @@ export class HandGestureManager {
 		hand,
 		threeObject,
 		camera,
+		handLabel,
 	}: {
 		hand: HandLandmark[];
 		threeObject: GLTF;
 		camera: three.PerspectiveCamera;
+		handLabel: HandLabel;
 	}): GestureResponse {
 		const fingerDistances = this.calculateDistancesBetweenFingers(hand);
 
@@ -222,6 +253,7 @@ export class HandGestureManager {
 
 		return this.validateGestures({
 			hand,
+			handLabel,
 			fingerDistances,
 			indexToThumbDistance,
 			threeObjectPosition: normalizedThreeObjectCoords,
