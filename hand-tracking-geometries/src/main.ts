@@ -105,13 +105,13 @@ const makeObjectFollowHand = (
 	threeObject: GLTF,
 	hand: HandLandmark[]
 ): void => {
-	const finger = hand[12];
+	const finger = hand[9]; // base of middle finger
 
 	// Ok, this is kinda intense but the whole gist of it is we need convert a mediapipe coords to usable threejs coords
 	// mediapipe goes from 0 ( left of screen ) to 1 ( right end of screen )
 	const handPos = getNormalizedDeviceCoords({
 		x: finger.x,
-		y: finger.y,
+		y: finger.y + 0.1,
 		mirrored: true,
 	});
 	threeObject.scene.position.copy(handPos);
@@ -135,8 +135,10 @@ const handleHandGesture = (
 				break;
 			case HandGestures.PINCHED:
 				if (data && typeof data === "number") {
-					const rotationY = handLabel === "Right" ? -data : data;
-					model.scene.rotation.y += rotationY;
+					// rotate left or right
+					// there's probably a better way
+					const rotationY = data <= -0.05 ? data : -data;
+					model.scene.rotation.y += rotationY * 2;
 				}
 				break;
 			default:
@@ -231,7 +233,6 @@ const drawHandLandmarks = (
 
 		multiHandLandmarks.forEach((hand, index) => {
 			const handLabel = multiHandedness[index]?.label;
-			console.log(handLabel);
 			drawHand(hand);
 			handleHandGesture(hand, handLabel);
 		});

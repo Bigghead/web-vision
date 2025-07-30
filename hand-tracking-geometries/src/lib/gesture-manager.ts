@@ -16,6 +16,12 @@ import type { GLTF } from "three/examples/jsm/Addons.js";
  *
  *
  */
+
+type NormalizedCoords = {
+	objectX: number;
+	objectY: number;
+};
+
 export class HandGestureManager {
 	// the indices of where mediapipe flags as tips or base / start of finger
 	private readonly fingerTipsIndices = [4, 8, 12, 16, 20];
@@ -42,7 +48,7 @@ export class HandGestureManager {
 	private getNormalizedObjectPosition(
 		threeObject: GLTF,
 		camera: three.PerspectiveCamera
-	) {
+	): NormalizedCoords {
 		const vector = new three.Vector3();
 		vector.copy(threeObject.scene.position);
 		vector.project(camera);
@@ -122,10 +128,12 @@ export class HandGestureManager {
 		hand,
 		fingerDistances,
 		indexToThumbDistance,
+		threeObjectPosition,
 	}: {
 		hand: HandLandmark[];
 		fingerDistances: FingerDistance[];
 		indexToThumbDistance: number;
+		threeObjectPosition: NormalizedCoords;
 	}): GestureResponse {
 		const gestureResponse: GestureResponse = {
 			gesture: "",
@@ -134,6 +142,7 @@ export class HandGestureManager {
 
 		const validPinch = this.validPinchDistance(indexToThumbDistance, 0.025);
 		const nonThumbFingers = fingerDistances.slice(1);
+		const otherFingersPinched = this.areOtherFingersPinched(nonThumbFingers);
 		const makingFist = this.allFingersMakingFist(nonThumbFingers);
 
 		// Todo, need a diff way of detecting a pinch in / out for scale
@@ -144,19 +153,21 @@ export class HandGestureManager {
 		if (validPinch && !makingFist) {
 			console.log("pinch");
 			const currentPinch = (thumbTip + indexTip) / 2;
-			const deltaX = currentPinch;
+			const { objectX } = threeObjectPosition;
+
+			// the tip coordinates are fliiped 1 - 0 left -> right because we reversed the webcam
+			const deltaX = -currentPinch - objectX;
 
 			gestureResponse.gesture = HandGestures.PINCHED;
-			gestureResponse.data = deltaX / 10;
-
+			gestureResponse.data = deltaX / 20;
 			return gestureResponse;
 		}
 
-		// if (otherFingersPinched) {
-		// 	console.log("squeeze");
-		// 	gestureResponse.gesture = HandGestures.SQUEEZED;
-		// 	return gestureResponse;
-		// }
+		if (otherFingersPinched) {
+			console.log("squeeze");
+			gestureResponse.gesture = HandGestures.SQUEEZED;
+			return gestureResponse;
+		}
 
 		if (makingFist) {
 			console.log("fist");
@@ -213,6 +224,7 @@ export class HandGestureManager {
 			hand,
 			fingerDistances,
 			indexToThumbDistance,
+			threeObjectPosition: normalizedThreeObjectCoords,
 		});
 	}
 }
