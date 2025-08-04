@@ -141,6 +141,22 @@ export class HandGestureManager {
 		);
 	}
 
+	private checkGestureType(
+		indexToThumbDistance: number,
+		fingerDistances: FingerDistance[]
+	) {
+		const validPinch = this.validPinchDistance(indexToThumbDistance, 0.025);
+		const nonThumbFingers = fingerDistances.slice(1);
+		const otherFingersPinched = this.areOtherFingersPinched(nonThumbFingers);
+		const makingFist = this.allFingersMakingFist(nonThumbFingers);
+
+		return {
+			validPinch,
+			otherFingersPinched,
+			makingFist,
+		};
+	}
+
 	private validateGestures({
 		hand,
 		handLabel,
@@ -159,10 +175,8 @@ export class HandGestureManager {
 			data: null,
 		};
 
-		const validPinch = this.validPinchDistance(indexToThumbDistance, 0.025);
-		const nonThumbFingers = fingerDistances.slice(1);
-		const otherFingersPinched = this.areOtherFingersPinched(nonThumbFingers);
-		const makingFist = this.allFingersMakingFist(nonThumbFingers);
+		const { validPinch, otherFingersPinched, makingFist } =
+			this.checkGestureType(indexToThumbDistance, fingerDistances);
 
 		// Todo, need a diff way of detecting a pinch in / out for scale
 
@@ -171,15 +185,15 @@ export class HandGestureManager {
 
 		// this.resetPinchedHands();
 		if (validPinch && !makingFist) {
-			console.log("pinch");
 			this.pinchedHands.set(handLabel, true);
 
 			if (this.bothHandsPinched()) {
 				console.log("both pinched");
-				this.resetPinchedHands();
+
 				return gestureResponse;
 			}
 
+			console.log("pinch");
 			const currentPinch = (thumbTip + indexTip) / 2;
 			const { objectX } = threeObjectPosition;
 
@@ -192,6 +206,8 @@ export class HandGestureManager {
 			return gestureResponse;
 		}
 
+		this.resetPinchedHands();
+
 		if (otherFingersPinched) {
 			console.log("squeeze");
 			gestureResponse.gesture = HandGestures.SQUEEZED;
@@ -203,22 +219,6 @@ export class HandGestureManager {
 			gestureResponse.gesture = HandGestures.FIST;
 			return gestureResponse;
 		}
-
-		// We might need two hands for this as the "squeeze" is fighting with a "pinch"
-		// technically same-ish gesture
-		// if (validPinch && !otherFingersPinched && !makingFist) {
-		// 	console.log("pinch");
-		// 	return HandGestures.PINCHED;
-		// }
-
-		// still need a differernt gesture for this
-		// maybe need 2 hands for this one
-		// if (gestures[HandGestures.PINCHED]) {
-		// 	if (indexDistance > 0.1) {
-		// 		console.log("unpinch");
-		// 		return HandGestures.UNPINCH;
-		// 	}
-		// }
 
 		return gestureResponse;
 	}
