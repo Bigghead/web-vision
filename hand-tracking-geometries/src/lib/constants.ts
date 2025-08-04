@@ -1,6 +1,5 @@
 export const ctxLineSize = 2.5;
 export const objectScaleTick = 0.025;
-export const pinchDistanceThreshold = 0.08;
 
 export const HandGestures = Object.freeze({
 	// pinched scale down or up
@@ -16,6 +15,10 @@ export const HandGestures = Object.freeze({
 	FINGER_UP: "finger up",
 	FINGER_UP_LEFT: "finger up left",
 	FINGER_UP_RIGHT: "finger up right",
+
+	//scale
+	SCALE_UP: "scale up",
+	SCALE_DOWN: "scale down",
 	// ....
 });
 
