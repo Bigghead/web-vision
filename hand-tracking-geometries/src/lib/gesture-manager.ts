@@ -27,7 +27,7 @@ export class HandGestureManager {
 	// the indices of where mediapipe flags as tips or base / start of finger
 	private readonly fingerTipsIndices = [4, 8, 12, 16, 20];
 	private readonly fingerBasesIndices = [0, 5, 9, 13, 17];
-	private readonly indexFingerRotationThreshold = 0.05;
+	private readonly pinchRotationThreshold = 0.025;
 
 	private pinchedHands: Map<
 		string,
@@ -35,7 +35,7 @@ export class HandGestureManager {
 			pinched: boolean;
 			data?: {
 				pinchPoint: { x: number; y: number };
-				distanceToObject: number;
+				pinchDistanceToObject: number;
 				initialDistance: number;
 			};
 		}
@@ -195,8 +195,6 @@ export class HandGestureManager {
 
 		// this.resetPinchedHands();
 		if (validPinch && !makingFist) {
-			this.pinchedHands.set(handLabel, { pinched: true });
-
 			const currentPinchX = (thumbX + indexX) / 2;
 			const currentPinchY = (thumbY + indexY) / 2;
 
@@ -210,9 +208,45 @@ export class HandGestureManager {
 					Math.pow(currentPinchY - objectY, 2)
 			);
 
-			if (this.bothHandsPinched()) {
-				console.log("both pinched");
+			this.pinchedHands.set(handLabel, {
+				pinched: true,
+				data: {
+					pinchPoint: { x: currentPinchX, y: currentPinchY },
+					pinchDistanceToObject,
+					initialDistance:
+						this.pinchedHands.get(handLabel)?.data?.initialDistance ||
+						pinchDistanceToObject,
+				},
+			});
 
+			if (this.bothHandsPinched()) {
+				const [{ data: leftHandData }, { data: rightHandData }] = Array.from(
+					this.pinchedHands.values()
+				);
+
+				if (leftHandData && rightHandData) {
+					const leftPinchChange =
+						leftHandData?.pinchDistanceToObject - leftHandData?.initialDistance;
+					const rightPinchChange =
+						rightHandData?.pinchDistanceToObject -
+						rightHandData?.initialDistance;
+
+					const averagePinchChange = (leftPinchChange + rightPinchChange) / 2;
+
+					console.log(averagePinchChange);
+
+					// need this abs check cause sometimes even when your fingers aren't moving
+					// it will still trigger a scale action
+					// shaky camera / mediapipe tracking maybe
+					if (Math.abs(averagePinchChange) > this.pinchRotationThreshold) {
+						if (averagePinchChange > 0) {
+							console.log("scale up");
+						}
+						if (averagePinchChange < 0) {
+							console.log("scale down");
+						}
+					}
+				}
 				return gestureResponse;
 			}
 
