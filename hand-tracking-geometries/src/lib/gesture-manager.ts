@@ -29,9 +29,19 @@ export class HandGestureManager {
 	private readonly fingerBasesIndices = [0, 5, 9, 13, 17];
 	private readonly indexFingerRotationThreshold = 0.05;
 
-	private pinchedHands: Map<string, boolean> = new Map([
-		["Left", false],
-		["Right", false],
+	private pinchedHands: Map<
+		string,
+		{
+			pinched: boolean;
+			data?: {
+				pinchPoint: { x: number; y: number };
+				distanceToObject: number;
+				initialDistance: number;
+			};
+		}
+	> = new Map([
+		["Left", { pinched: false }],
+		["Right", { pinched: false }],
 	]);
 
 	private calculateTipDistances(
@@ -131,13 +141,13 @@ export class HandGestureManager {
 	};
 
 	private resetPinchedHands(): void {
-		this.pinchedHands.forEach((_, key) => this.pinchedHands.set(key, false));
+		this.pinchedHands.forEach((_, key) => this.pinchedHands.delete(key));
 	}
 
 	private bothHandsPinched(): boolean {
 		return (
-			this.pinchedHands.get("Left") === true &&
-			this.pinchedHands.get("Right") === true
+			this.pinchedHands.get("Left")?.pinched === true &&
+			this.pinchedHands.get("Right")?.pinched === true
 		);
 	}
 
@@ -180,12 +190,25 @@ export class HandGestureManager {
 
 		// Todo, need a diff way of detecting a pinch in / out for scale
 
-		const thumbTip = fingerDistances[0]?.fingerTip.x;
-		const indexTip = fingerDistances[1]?.fingerTip.x;
+		const { x: thumbX, y: thumbY } = fingerDistances[0]?.fingerTip;
+		const { x: indexX, y: indexY } = fingerDistances[1]?.fingerTip;
 
 		// this.resetPinchedHands();
 		if (validPinch && !makingFist) {
-			this.pinchedHands.set(handLabel, true);
+			this.pinchedHands.set(handLabel, { pinched: true });
+
+			const currentPinchX = (thumbX + indexX) / 2;
+			const currentPinchY = (thumbY + indexY) / 2;
+
+			const { objectX, objectY } = threeObjectPosition;
+
+			// need to check euclid distance from pinch to object center to check how far pinches are
+			// √[(x₂ - x₁)² + (y₂ - y₁)²] in case you need to see the formula too
+
+			const pinchDistanceToObject = Math.sqrt(
+				Math.pow(currentPinchX - objectX, 2) +
+					Math.pow(currentPinchY - objectY, 2)
+			);
 
 			if (this.bothHandsPinched()) {
 				console.log("both pinched");
@@ -194,11 +217,9 @@ export class HandGestureManager {
 			}
 
 			console.log("pinch");
-			const currentPinch = (thumbTip + indexTip) / 2;
-			const { objectX } = threeObjectPosition;
 
 			// the tip coordinates are fliiped 1 - 0 left -> right because we reversed the webcam
-			const deltaX = -currentPinch - objectX;
+			const deltaX = -currentPinchX - objectX;
 
 			gestureResponse.gesture = HandGestures.PINCHED;
 			gestureResponse.data = deltaX / 20;
