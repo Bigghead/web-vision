@@ -1,18 +1,12 @@
 import { ThreeCanvas } from "../src/lib/canvas";
 import { MediaPipeHands } from "./lib/media-pipe-hands";
-import {
-	ctxLineSize,
-	digits,
-	objectScaleTick,
-	HandGestures,
-} from "./lib/constants";
+import { ctxLineSize, digits, HandGestures } from "./lib/constants";
 import {
 	type MultiHandedness,
 	type HandLandmark,
 	type WebcamResponse,
-	type TransformDirection,
-	type TransformationType,
 	type GestureResponse,
+	type HandLabel,
 } from "./lib/types";
 import { HandGestureManager } from "./lib/gesture-manager";
 import type { GLTF } from "three/examples/jsm/Addons.js";
@@ -66,81 +60,86 @@ const getDimensionsFromElement = (
 	canvas2d.setAttribute("width", (width * dpr).toString());
 })();
 
-const detectHandGesture = (
-	hand: HandLandmark[],
-	threeObject: GLTF
-): GestureResponse => {
-	return gestures.detectGesture({ hand, threeObject, camera });
-};
-
-const transformObject = ({
-	threeObj,
-	transformDirection,
-	transformation,
+const detectHandGesture = ({
+	hand,
+	threeObject,
+	handLabel,
 }: {
-	threeObj: GLTF;
-	transformDirection: TransformDirection;
-	transformation: TransformationType;
-}): void => {
-	// scale down ( negative ) if down direction
-	const scaleStep =
-		transformDirection === "up" || transformDirection === "left"
-			? objectScaleTick
-			: -objectScaleTick;
-
-	if (transformation === "scale") {
-		if (threeObj.scene.scale.x >= 0.2 && threeObj.scene.scale.x <= 5) {
-			threeObj.scene.scale.x += scaleStep;
-			threeObj.scene.scale.y += scaleStep;
-			threeObj.scene.scale.z += scaleStep;
-		}
-	}
-
-	if (transformation === "rotation") {
-		threeObj.scene.rotation.y += scaleStep;
-	}
+	hand: HandLandmark[];
+	threeObject: GLTF;
+	handLabel: HandLabel;
+}): GestureResponse => {
+	return gestures.detectGesture({ hand, threeObject, camera, handLabel });
 };
 
 const makeObjectFollowHand = (
 	threeObject: GLTF,
 	hand: HandLandmark[]
 ): void => {
-	const finger = hand[12];
+	const finger = hand[9]; // base of middle finger
 
 	// Ok, this is kinda intense but the whole gist of it is we need convert a mediapipe coords to usable threejs coords
 	// mediapipe goes from 0 ( left of screen ) to 1 ( right end of screen )
 	const handPos = getNormalizedDeviceCoords({
 		x: finger.x,
-		y: finger.y,
+		y: finger.y + 0.1,
 		mirrored: true,
 	});
 	threeObject.scene.position.copy(handPos);
 };
 
-const handleHandGesture = (
-	hand: HandLandmark[],
-	handLabel: "Right" | "Left"
-) => {
+const handleModelRotation = (deltaY: number, model: GLTF): void => {
+	// rotate left or right
+	// there's probably a better way
+	const rotationY = deltaY <= -0.05 ? deltaY : -deltaY;
+	model.scene.rotation.y += rotationY * 2;
+};
+
+const handleModelScale = (
+	gesture: "scale up" | "scale down",
+	model: GLTF
+): void => {
+	let scale = 0.015;
+	const currentScaling = model.scene.scale.x;
+
+	if (currentScaling >= 3.5) return;
+	if (gesture === HandGestures.SCALE_DOWN && currentScaling >= 0.3) {
+		scale = -scale;
+	}
+
+	model.scene.scale.x += scale;
+	model.scene.scale.y += scale;
+	model.scene.scale.z += scale;
+};
+
+const handleHandGesture = (hand: HandLandmark[], handLabel: HandLabel) => {
 	const models = threeObject;
 	if (!models.length) return;
 
 	models.forEach((model) => {
-		const { gesture, data } = detectHandGesture(hand, model);
+		const { gesture, data } = detectHandGesture({
+			hand,
+			threeObject: model,
+			handLabel,
+		});
 
 		switch (gesture) {
 			case HandGestures.FIST:
 				makeObjectFollowHand(model, hand);
-				break;
+				return;
 			case HandGestures.SQUEEZED:
-				break;
+				return;
 			case HandGestures.PINCHED:
 				if (data && typeof data === "number") {
-					const rotationY = handLabel === "Right" ? -data : data;
-					model.scene.rotation.y += rotationY;
+					handleModelRotation(data, model);
 				}
-				break;
+				return;
+			case HandGestures.SCALE_UP:
+			case HandGestures.SCALE_DOWN:
+				handleModelScale(gesture, model);
+				return;
 			default:
-				break;
+				return;
 		}
 	});
 };
@@ -231,7 +230,6 @@ const drawHandLandmarks = (
 
 		multiHandLandmarks.forEach((hand, index) => {
 			const handLabel = multiHandedness[index]?.label;
-			console.log(handLabel);
 			drawHand(hand);
 			handleHandGesture(hand, handLabel);
 		});
