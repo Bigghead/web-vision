@@ -222,8 +222,6 @@ export class HandGestureManager {
 
 			const averagePinchChange = (leftPinchChange + rightPinchChange) / 2;
 
-			console.log(averagePinchChange);
-
 			// need this abs check cause sometimes even when your fingers aren't moving
 			// it will still trigger a scale action
 			// shaky camera / mediapipe tracking maybe

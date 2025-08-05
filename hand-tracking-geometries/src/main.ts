@@ -1,17 +1,10 @@
 import { ThreeCanvas } from "../src/lib/canvas";
 import { MediaPipeHands } from "./lib/media-pipe-hands";
-import {
-	ctxLineSize,
-	digits,
-	objectScaleTick,
-	HandGestures,
-} from "./lib/constants";
+import { ctxLineSize, digits, HandGestures } from "./lib/constants";
 import {
 	type MultiHandedness,
 	type HandLandmark,
 	type WebcamResponse,
-	type TransformDirection,
-	type TransformationType,
 	type GestureResponse,
 	type HandLabel,
 } from "./lib/types";
@@ -79,34 +72,6 @@ const detectHandGesture = ({
 	return gestures.detectGesture({ hand, threeObject, camera, handLabel });
 };
 
-const transformObject = ({
-	threeObj,
-	transformDirection,
-	transformation,
-}: {
-	threeObj: GLTF;
-	transformDirection: TransformDirection;
-	transformation: TransformationType;
-}): void => {
-	// scale down ( negative ) if down direction
-	const scaleStep =
-		transformDirection === "up" || transformDirection === "left"
-			? objectScaleTick
-			: -objectScaleTick;
-
-	if (transformation === "scale") {
-		if (threeObj.scene.scale.x >= 0.2 && threeObj.scene.scale.x <= 5) {
-			threeObj.scene.scale.x += scaleStep;
-			threeObj.scene.scale.y += scaleStep;
-			threeObj.scene.scale.z += scaleStep;
-		}
-	}
-
-	if (transformation === "rotation") {
-		threeObj.scene.rotation.y += scaleStep;
-	}
-};
-
 const makeObjectFollowHand = (
 	threeObject: GLTF,
 	hand: HandLandmark[]
@@ -123,6 +88,30 @@ const makeObjectFollowHand = (
 	threeObject.scene.position.copy(handPos);
 };
 
+const handleModelRotation = (deltaY: number, model: GLTF): void => {
+	// rotate left or right
+	// there's probably a better way
+	const rotationY = deltaY <= -0.05 ? deltaY : -deltaY;
+	model.scene.rotation.y += rotationY * 2;
+};
+
+const handleModelScale = (
+	gesture: "scale up" | "scale down",
+	model: GLTF
+): void => {
+	let scale = 0.01;
+	const currentScaling = model.scene.scale.x;
+
+	if (currentScaling >= 3.5) return;
+	if (gesture === HandGestures.SCALE_DOWN && currentScaling >= 0.25) {
+		scale = -scale;
+	}
+
+	model.scene.scale.x += scale;
+	model.scene.scale.y += scale;
+	model.scene.scale.z += scale;
+};
+
 const handleHandGesture = (hand: HandLandmark[], handLabel: HandLabel) => {
 	const models = threeObject;
 	if (!models.length) return;
@@ -137,19 +126,20 @@ const handleHandGesture = (hand: HandLandmark[], handLabel: HandLabel) => {
 		switch (gesture) {
 			case HandGestures.FIST:
 				makeObjectFollowHand(model, hand);
-				break;
+				return;
 			case HandGestures.SQUEEZED:
-				break;
+				return;
 			case HandGestures.PINCHED:
 				if (data && typeof data === "number") {
-					// rotate left or right
-					// there's probably a better way
-					const rotationY = data <= -0.05 ? data : -data;
-					model.scene.rotation.y += rotationY * 2;
+					handleModelRotation(data, model);
 				}
-				break;
+				return;
+			case HandGestures.SCALE_UP:
+			case HandGestures.SCALE_DOWN:
+				handleModelScale(gesture, model);
+				return;
 			default:
-				break;
+				return;
 		}
 	});
 };
