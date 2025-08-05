@@ -99,11 +99,11 @@ const handleModelScale = (
 	gesture: "scale up" | "scale down",
 	model: GLTF
 ): void => {
-	let scale = 0.01;
+	let scale = 0.015;
 	const currentScaling = model.scene.scale.x;
 
 	if (currentScaling >= 3.5) return;
-	if (gesture === HandGestures.SCALE_DOWN && currentScaling >= 0.25) {
+	if (gesture === HandGestures.SCALE_DOWN && currentScaling >= 0.3) {
 		scale = -scale;
 	}
 

@@ -157,6 +157,7 @@ export class ThreeCanvas {
 	scene = new three.Scene();
 	textureLoader = new three.TextureLoader();
 	clock = new three.Clock();
+	vector3D = new three.Vector3();
 
 	constructor({
 		canvas,
@@ -259,7 +260,7 @@ export class ThreeCanvas {
 		const flipMirrorFlag = mirrored ? -1 : 1;
 		const coordX = flipMirrorFlag * (x * 2 - 1);
 		const coordY = flipMirrorFlag * (y * 2 - 1);
-		const normalizedCoordinates = new three.Vector3(coordX, coordY, 0);
+		const normalizedCoordinates = this.vector3D.set(coordX, coordY, 0);
 
 		// this is the magic trick, it turns the above vector3 to a point according to where the camera sees it
 		normalizedCoordinates.unproject(this.threeCamera.camera);

@@ -28,7 +28,9 @@ export class HandGestureManager {
 	private readonly fingerTipsIndices = [4, 8, 12, 16, 20];
 	private readonly fingerBasesIndices = [0, 5, 9, 13, 17];
 	private readonly pinchDistanceThreshold = 0.08;
-	private readonly pinchRotationThreshold = 0.025;
+	private readonly pinchRotationThreshold = 0.02;
+
+	private vector3d: three.Vector3 = new three.Vector3();
 
 	private pinchedHands: Map<
 		string,
@@ -66,14 +68,13 @@ export class HandGestureManager {
 		threeObject: GLTF,
 		camera: three.PerspectiveCamera
 	): NormalizedCoords {
-		const vector = new three.Vector3();
-		vector.copy(threeObject.scene.position);
-		vector.project(camera);
+		this.vector3d.copy(threeObject.scene.position);
+		this.vector3d.project(camera);
 		// now vector x/y/z are in a range from -1 - 1 ( normalized coordinates )
 		// we need to convert to mediapipe coordinates ( from 0 to 1 )
 
-		const objectX = (vector.x + 1) / 2;
-		const objectY = (1 - vector.y) / 2;
+		const objectX = (this.vector3d.x + 1) / 2;
+		const objectY = (1 - this.vector3d.y) / 2;
 
 		return {
 			objectX,
@@ -98,7 +99,8 @@ export class HandGestureManager {
 
 			// this distance to be a "zone" of where the object is
 			// but it's ok for now
-			if (distance > 0.25) {
+			// todo - get actual model scale zone
+			if (distance > 0.4) {
 				allTipsAboveObject = false;
 			}
 		});
