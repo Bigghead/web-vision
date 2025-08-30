@@ -23,14 +23,9 @@ type NormalizedCoords = {
 	objectY: number;
 };
 
-export class HandGestureManager {
-	// the indices of where mediapipe flags as tips or base / start of finger
-	private readonly fingerTipsIndices = [4, 8, 12, 16, 20];
-	private readonly fingerBasesIndices = [0, 5, 9, 13, 17];
+class GestureHandler {
 	private readonly pinchDistanceThreshold = 0.08;
 	private readonly pinchRotationThreshold = 0.02;
-
-	private vector3d: three.Vector3 = new three.Vector3();
 
 	private pinchedHands: Map<
 		string,
@@ -47,6 +42,134 @@ export class HandGestureManager {
 		["Right", { pinched: false }],
 	]);
 
+	private validPinchDistance(
+		distance: number,
+		distanceThreshold = this.pinchDistanceThreshold
+	): boolean {
+		return distance <= distanceThreshold;
+	}
+
+	// checking if all non-thumb fingers are curled into a fist.
+	private allFingersMakingFist = (fingers: FingerDistance[]): boolean => {
+		return fingers.every(
+			(finger) => finger.distanceToBase < this.pinchDistanceThreshold - 0.02
+		);
+	};
+
+	// checking if the middle, ring, and pinky fingers are "pinched" towards the thumb.
+	private areOtherFingersPinched = (fingers: FingerDistance[]): boolean => {
+		return fingers.every((finger) =>
+			this.validPinchDistance(finger.distanceToThumb, 0.04)
+		);
+	};
+
+	handleSinglehandPinch({
+		fingerDistances,
+		threeObjectPosition,
+		handLabel,
+	}: {
+		fingerDistances: FingerDistance[];
+		threeObjectPosition: NormalizedCoords;
+		handLabel: HandLabel;
+	}) {
+		const thumbTip = fingerDistances[0]?.fingerTip;
+		const indexTip = fingerDistances[1]?.fingerTip;
+
+		const currentPinchX = (thumbTip.x + indexTip.x) / 2;
+		const currentPinchY = (thumbTip.y + indexTip.y) / 2;
+
+		const { objectX, objectY } = threeObjectPosition;
+
+		// need to check euclid distance from pinch to object center to check how far pinches are
+		// √[(x₂ - x₁)² + (y₂ - y₁)²] in case you need to see the formula too
+		const pinchDistanceToObject = Math.sqrt(
+			Math.pow(currentPinchX - objectX, 2) +
+				Math.pow(currentPinchY - objectY, 2)
+		);
+
+		this.pinchedHands.set(handLabel, {
+			pinched: true,
+			data: {
+				pinchPoint: { x: currentPinchX, y: currentPinchY },
+				pinchDistanceToObject,
+				initialDistance:
+					this.pinchedHands.get(handLabel)?.data?.initialDistance ||
+					pinchDistanceToObject,
+			},
+		});
+
+		return {
+			currentPinchX,
+			objectX,
+		};
+	}
+
+	handleTwohandPinch(): GestureResponse {
+		const [{ data: leftHandData }, { data: rightHandData }] = Array.from(
+			this.pinchedHands.values()
+		);
+
+		if (leftHandData && rightHandData) {
+			const leftPinchChange =
+				leftHandData?.pinchDistanceToObject - leftHandData?.initialDistance;
+			const rightPinchChange =
+				rightHandData?.pinchDistanceToObject - rightHandData?.initialDistance;
+
+			const averagePinchChange = (leftPinchChange + rightPinchChange) / 2;
+
+			// need this abs check cause sometimes even when your fingers aren't moving
+			// it will still trigger a scale action
+			// shaky camera / mediapipe tracking maybe
+			if (Math.abs(averagePinchChange) > this.pinchRotationThreshold) {
+				if (averagePinchChange > 0) {
+					console.log("scale up");
+					return { gesture: HandGestures.SCALE_UP };
+				}
+				if (averagePinchChange < 0) {
+					console.log("scale down");
+					return { gesture: HandGestures.SCALE_DOWN };
+				}
+			}
+		}
+		return { gesture: "" };
+	}
+
+	resetPinchedHands(): void {
+		this.pinchedHands.forEach((_, key) => this.pinchedHands.delete(key));
+	}
+
+	bothHandsPinched(): boolean {
+		return (
+			this.pinchedHands.get("Left")?.pinched === true &&
+			this.pinchedHands.get("Right")?.pinched === true
+		);
+	}
+
+	checkGestureType(
+		indexToThumbDistance: number,
+		fingerDistances: FingerDistance[]
+	) {
+		const validPinch = this.validPinchDistance(indexToThumbDistance, 0.025);
+		const nonThumbFingers = fingerDistances.slice(1);
+		const otherFingersPinched = this.areOtherFingersPinched(nonThumbFingers);
+		const makingFist = this.allFingersMakingFist(nonThumbFingers);
+
+		return {
+			validPinch,
+			otherFingersPinched,
+			makingFist,
+		};
+	}
+}
+
+export class HandGestureManager {
+	// the indices of where mediapipe flags as tips or base / start of finger
+	private readonly fingerTipsIndices = [4, 8, 12, 16, 20];
+	private readonly fingerBasesIndices = [0, 5, 9, 13, 17];
+	private vector3d = new three.Vector3();
+
+	gestureHandler = new GestureHandler();
+
 	private calculateTipDistances(
 		tipA: HandLandmark,
 		tipB: HandLandmark
@@ -54,13 +177,6 @@ export class HandGestureManager {
 		const distanceX = tipA.x - tipB.x;
 		const distanceY = tipA.y - tipB.y;
 		return Math.hypot(distanceX, distanceY);
-	}
-
-	private validPinchDistance(
-		distance: number,
-		distanceThreshold = this.pinchDistanceThreshold
-	): boolean {
-		return distance <= distanceThreshold;
 	}
 
 	// Converts threejs coordinates into normalized mediapipe coords
@@ -129,118 +245,6 @@ export class HandGestureManager {
 		return fingerDistances;
 	};
 
-	// checking if all non-thumb fingers are curled into a fist.
-	private allFingersMakingFist = (fingers: FingerDistance[]): boolean => {
-		return fingers.every(
-			(finger) => finger.distanceToBase < this.pinchDistanceThreshold - 0.02
-		);
-	};
-
-	// checking if the middle, ring, and pinky fingers are "pinched" towards the thumb.
-	private areOtherFingersPinched = (fingers: FingerDistance[]): boolean => {
-		return fingers.every((finger) =>
-			this.validPinchDistance(finger.distanceToThumb, 0.04)
-		);
-	};
-
-	private resetPinchedHands(): void {
-		this.pinchedHands.forEach((_, key) => this.pinchedHands.delete(key));
-	}
-
-	private bothHandsPinched(): boolean {
-		return (
-			this.pinchedHands.get("Left")?.pinched === true &&
-			this.pinchedHands.get("Right")?.pinched === true
-		);
-	}
-
-	private checkGestureType(
-		indexToThumbDistance: number,
-		fingerDistances: FingerDistance[]
-	) {
-		const validPinch = this.validPinchDistance(indexToThumbDistance, 0.025);
-		const nonThumbFingers = fingerDistances.slice(1);
-		const otherFingersPinched = this.areOtherFingersPinched(nonThumbFingers);
-		const makingFist = this.allFingersMakingFist(nonThumbFingers);
-
-		return {
-			validPinch,
-			otherFingersPinched,
-			makingFist,
-		};
-	}
-
-	private handleSinglehandPinch({
-		fingerDistances,
-		threeObjectPosition,
-		handLabel,
-	}: {
-		fingerDistances: FingerDistance[];
-		threeObjectPosition: NormalizedCoords;
-		handLabel: HandLabel;
-	}) {
-		const thumbTip = fingerDistances[0]?.fingerTip;
-		const indexTip = fingerDistances[1]?.fingerTip;
-
-		const currentPinchX = (thumbTip.x + indexTip.x) / 2;
-		const currentPinchY = (thumbTip.y + indexTip.y) / 2;
-
-		const { objectX, objectY } = threeObjectPosition;
-
-		// need to check euclid distance from pinch to object center to check how far pinches are
-		// √[(x₂ - x₁)² + (y₂ - y₁)²] in case you need to see the formula too
-		const pinchDistanceToObject = Math.sqrt(
-			Math.pow(currentPinchX - objectX, 2) +
-				Math.pow(currentPinchY - objectY, 2)
-		);
-
-		this.pinchedHands.set(handLabel, {
-			pinched: true,
-			data: {
-				pinchPoint: { x: currentPinchX, y: currentPinchY },
-				pinchDistanceToObject,
-				initialDistance:
-					this.pinchedHands.get(handLabel)?.data?.initialDistance ||
-					pinchDistanceToObject,
-			},
-		});
-
-		return {
-			currentPinchX,
-			objectX,
-		};
-	}
-
-	private handleTwohandPinch(): GestureResponse {
-		const [{ data: leftHandData }, { data: rightHandData }] = Array.from(
-			this.pinchedHands.values()
-		);
-
-		if (leftHandData && rightHandData) {
-			const leftPinchChange =
-				leftHandData?.pinchDistanceToObject - leftHandData?.initialDistance;
-			const rightPinchChange =
-				rightHandData?.pinchDistanceToObject - rightHandData?.initialDistance;
-
-			const averagePinchChange = (leftPinchChange + rightPinchChange) / 2;
-
-			// need this abs check cause sometimes even when your fingers aren't moving
-			// it will still trigger a scale action
-			// shaky camera / mediapipe tracking maybe
-			if (Math.abs(averagePinchChange) > this.pinchRotationThreshold) {
-				if (averagePinchChange > 0) {
-					console.log("scale up");
-					return { gesture: HandGestures.SCALE_UP };
-				}
-				if (averagePinchChange < 0) {
-					console.log("scale down");
-					return { gesture: HandGestures.SCALE_DOWN };
-				}
-			}
-		}
-		return { gesture: "" };
-	}
-
 	private validateGestures({
 		handLabel,
 		fingerDistances,
@@ -257,19 +261,28 @@ export class HandGestureManager {
 			data: null,
 		};
 
-		const { validPinch, otherFingersPinched, makingFist } =
-			this.checkGestureType(indexToThumbDistance, fingerDistances);
+		const {
+			checkGestureType,
+			handleSinglehandPinch,
+			bothHandsPinched,
+			handleTwohandPinch,
+			resetPinchedHands,
+		} = this.gestureHandler;
+
+		const { validPinch, otherFingersPinched, makingFist } = checkGestureType(
+			indexToThumbDistance,
+			fingerDistances
+		);
 
 		if (validPinch && !makingFist) {
-			const { currentPinchX, objectX } = this.handleSinglehandPinch({
+			if (bothHandsPinched()) {
+				return handleTwohandPinch();
+			}
+			const { currentPinchX, objectX } = handleSinglehandPinch({
 				fingerDistances,
 				threeObjectPosition,
 				handLabel,
 			});
-
-			if (this.bothHandsPinched()) {
-				return this.handleTwohandPinch();
-			}
 
 			console.log("pinch");
 
@@ -278,16 +291,13 @@ export class HandGestureManager {
 			return { gesture: HandGestures.PINCHED, data: deltaX / 20 };
 		}
 
-		this.resetPinchedHands();
+		resetPinchedHands();
 
 		if (otherFingersPinched) {
-			console.log("squeeze");
 			return { gesture: HandGestures.SQUEEZED };
 		}
 
 		if (makingFist) {
-			console.log("fist");
-			gestureResponse.gesture = HandGestures.FIST;
 			return { gesture: HandGestures.FIST };
 		}
 
