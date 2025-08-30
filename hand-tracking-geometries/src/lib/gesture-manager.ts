@@ -261,45 +261,32 @@ export class HandGestureManager {
 			data: null,
 		};
 
-		const {
-			checkGestureType,
-			handleSinglehandPinch,
-			bothHandsPinched,
-			handleTwohandPinch,
-			resetPinchedHands,
-		} = this.gestureHandler;
-
-		const { validPinch, otherFingersPinched, makingFist } = checkGestureType(
-			indexToThumbDistance,
-			fingerDistances
-		);
+		const { validPinch, otherFingersPinched, makingFist } =
+			this.gestureHandler.checkGestureType(
+				indexToThumbDistance,
+				fingerDistances
+			);
 
 		if (validPinch && !makingFist) {
-			if (bothHandsPinched()) {
-				return handleTwohandPinch();
-			}
-			const { currentPinchX, objectX } = handleSinglehandPinch({
-				fingerDistances,
-				threeObjectPosition,
-				handLabel,
-			});
+			const { currentPinchX, objectX } =
+				this.gestureHandler.handleSinglehandPinch({
+					fingerDistances,
+					threeObjectPosition,
+					handLabel,
+				});
 
-			console.log("pinch");
+			if (this.gestureHandler.bothHandsPinched()) {
+				return this.gestureHandler.handleTwohandPinch();
+			}
 
 			// the tip coordinates are fliiped 1 - 0 left -> right because we reversed the webcam
 			const deltaX = -currentPinchX - objectX;
 			return { gesture: HandGestures.PINCHED, data: deltaX / 20 };
 		}
 
-		resetPinchedHands();
-
-		if (otherFingersPinched) {
-			return { gesture: HandGestures.SQUEEZED };
-		}
-
-		if (makingFist) {
-			return { gesture: HandGestures.FIST };
-		}
+		this.gestureHandler.resetPinchedHands();
+		if (otherFingersPinched) return { gesture: HandGestures.SQUEEZED };
+		if (makingFist) return { gesture: HandGestures.FIST };
 
 		return gestureResponse;
 	}
