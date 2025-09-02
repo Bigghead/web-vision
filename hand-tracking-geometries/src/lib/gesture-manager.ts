@@ -3,6 +3,7 @@ import { HandGestures } from "./constants";
 import {
 	type FingerDistance,
 	type GestureResponse,
+	type HandGestureType,
 	type HandLabel,
 	type HandLandmark,
 } from "./types";
@@ -35,9 +36,21 @@ type Coords2D = {
 	y: number;
 };
 
+type GestureData = {
+	fingerDistances: FingerDistance[];
+	normalizedThreeObjectCoords: NormalizedCoords;
+	handLabel: HandLabel;
+};
+
+type GestureCallback = (data: GestureData) => GestureResponse;
+
 // ==== utils ===== //
 const getEuclidianDistance = (a: Coords2D, b: Coords2D): number => {
 	return Math.hypot(a.x - b.x, a.y - b.y);
+};
+const defaultGestureResponse: GestureResponse = {
+	gesture: "",
+	data: null,
 };
 
 class GestureHandler {
@@ -55,6 +68,52 @@ class GestureHandler {
 		["Left", { pinched: false }],
 		["Right", { pinched: false }],
 	]);
+
+	private gestureResponseCallbacks: Record<string, GestureCallback> = {
+		pinched: ({ fingerDistances, normalizedThreeObjectCoords, handLabel }) =>
+			this.handleSinglehandPinch({
+				fingerDistances,
+				normalizedThreeObjectCoords,
+				handLabel,
+			}),
+		two_hand_pinched: () => this.handleTwohandPinch(),
+		squeezed: () => ({ gesture: HandGestures.SQUEEZED }),
+		fist: () => ({ gesture: HandGestures.FIST }),
+	};
+
+	emitGestureResponse(
+		gesture: Partial<HandGestureType> | string,
+		data: GestureData
+	): GestureResponse {
+		const callback = this.gestureResponseCallbacks[gesture];
+		if (callback) {
+			return callback(data);
+		}
+
+		return defaultGestureResponse;
+	}
+
+	private isHandHoveringAboveObject = ({
+		tips,
+		position,
+	}: {
+		tips: HandLandmark[];
+		position: NormalizedCoords;
+	}): boolean => {
+		const objectPosition = {
+			x: position.objectX,
+			y: position.objectY,
+		};
+
+		return tips.every((tip) => {
+			const distance = getEuclidianDistance(tip, objectPosition);
+
+			// this distance to be a "zone" of where the object is
+			// but it's ok for now
+			// todo - get actual model scale zone
+			return distance < 0.2;
+		});
+	};
 
 	private validPinchDistance(
 		distance: number,
@@ -77,22 +136,24 @@ class GestureHandler {
 		);
 	};
 
+	storePinchData(): void {}
+
 	handleSinglehandPinch({
 		fingerDistances,
-		threeObjectPosition,
+		normalizedThreeObjectCoords,
 		handLabel,
 	}: {
 		fingerDistances: FingerDistance[];
-		threeObjectPosition: NormalizedCoords;
+		normalizedThreeObjectCoords: NormalizedCoords;
 		handLabel: HandLabel;
-	}) {
+	}): GestureResponse {
 		const thumbTip = fingerDistances[0]?.fingerTip;
 		const indexTip = fingerDistances[1]?.fingerTip;
 
 		const currentPinchX = (thumbTip.x + indexTip.x) / 2;
 		const currentPinchY = (thumbTip.y + indexTip.y) / 2;
 
-		const { objectX, objectY } = threeObjectPosition;
+		const { objectX, objectY } = normalizedThreeObjectCoords;
 
 		// need to check euclid distance from pinch to object center to check how far pinches are
 		// √[(x₂ - x₁)² + (y₂ - y₁)²] in case you need to see the formula too
@@ -112,9 +173,12 @@ class GestureHandler {
 			},
 		});
 
+		// the tip coordinates are fliiped 1 - 0 left -> right because we reversed the webcam
+		const deltaX = -currentPinchX - objectX;
+
 		return {
-			currentPinchX,
-			objectX,
+			gesture: HandGestures.PINCHED,
+			data: deltaX / PINCH_DELTA_SCALE,
 		};
 	}
 
@@ -130,6 +194,7 @@ class GestureHandler {
 				rightHandData?.pinchDistanceToObject - rightHandData?.initialDistance;
 
 			const averagePinchChange = (leftPinchChange + rightPinchChange) / 2;
+			console.log(averagePinchChange, PINCH_ROTATION_THRESHOLD);
 
 			// need this abs check cause sometimes even when your fingers aren't moving
 			// it will still trigger a scale action
@@ -144,6 +209,24 @@ class GestureHandler {
 			}
 		}
 		return { gesture: "" };
+	}
+
+	handleFist({
+		fingerDistances,
+		normalizedThreeObjectCoords,
+	}: {
+		fingerDistances: FingerDistance[];
+		normalizedThreeObjectCoords: NormalizedCoords;
+	}): GestureResponse {
+		const isHandHoveringOverObject = this.isHandHoveringAboveObject({
+			tips: fingerDistances.map((finger) => finger.fingerTip),
+			position: normalizedThreeObjectCoords,
+		});
+		if (isHandHoveringOverObject) {
+			return { gesture: HandGestures.FIST };
+		}
+
+		return defaultGestureResponse;
 	}
 
 	resetPinchedHands(): void {
@@ -201,28 +284,6 @@ export class HandGestureManager {
 		};
 	}
 
-	private isHandHoveringAboveObject = ({
-		tips,
-		position,
-	}: {
-		tips: HandLandmark[];
-		position: NormalizedCoords;
-	}): boolean => {
-		const objectPosition = {
-			x: position.objectX,
-			y: position.objectY,
-		};
-
-		return tips.every((tip) => {
-			const distance = getEuclidianDistance(tip, objectPosition);
-
-			// this distance to be a "zone" of where the object is
-			// but it's ok for now
-			// todo - get actual model scale zone
-			return distance < 0.2;
-		});
-	};
-
 	private calculateDistancesBetweenFingers = (
 		hand: HandLandmark[]
 	): FingerDistance[] => {
@@ -247,21 +308,12 @@ export class HandGestureManager {
 
 	// todo, break this up
 	private validateGestures({
-		handLabel,
 		fingerDistances,
 		indexToThumbDistance,
-		threeObjectPosition,
 	}: {
-		handLabel: HandLabel;
 		fingerDistances: FingerDistance[];
 		indexToThumbDistance: number;
-		threeObjectPosition: NormalizedCoords;
-	}): GestureResponse {
-		const gestureResponse: GestureResponse = {
-			gesture: "",
-			data: null,
-		};
-
+	}): Partial<HandGestureType> | null {
 		const { validPinch, otherFingersPinched, makingFist } =
 			this.gestureHandler.checkGestureType(
 				indexToThumbDistance,
@@ -269,40 +321,18 @@ export class HandGestureManager {
 			);
 
 		if (validPinch && !makingFist) {
-			const { currentPinchX, objectX } =
-				this.gestureHandler.handleSinglehandPinch({
-					fingerDistances,
-					threeObjectPosition,
-					handLabel,
-				});
-
 			if (this.gestureHandler.bothHandsPinched()) {
-				return this.gestureHandler.handleTwohandPinch();
+				return HandGestures.TWO_HAND_PINCHED;
 			}
 
-			// the tip coordinates are fliiped 1 - 0 left -> right because we reversed the webcam
-			const deltaX = -currentPinchX - objectX;
-
-			return {
-				gesture: HandGestures.PINCHED,
-				data: deltaX / PINCH_DELTA_SCALE,
-			};
+			return HandGestures.PINCHED;
 		}
 
 		this.gestureHandler.resetPinchedHands();
-		if (otherFingersPinched) return { gesture: HandGestures.SQUEEZED };
-		if (makingFist) {
-			const isHandHoveringOverObject = this.isHandHoveringAboveObject({
-				tips: fingerDistances.map((finger) => finger.fingerTip),
-				position: threeObjectPosition,
-			});
+		if (otherFingersPinched) return HandGestures.SQUEEZED;
+		if (makingFist) return HandGestures.FIST;
 
-			if (isHandHoveringOverObject) {
-				return { gesture: HandGestures.FIST };
-			}
-		}
-
-		return gestureResponse;
+		return null;
 	}
 
 	detectGesture({
@@ -325,11 +355,19 @@ export class HandGestureManager {
 			camera
 		);
 
-		return this.validateGestures({
-			handLabel,
+		const gesture = this.validateGestures({
 			fingerDistances,
 			indexToThumbDistance,
-			threeObjectPosition: normalizedThreeObjectCoords,
 		});
+
+		if (!gesture) return defaultGestureResponse;
+
+		const data = {
+			fingerDistances,
+			normalizedThreeObjectCoords,
+			handLabel,
+		};
+
+		return this.gestureHandler.emitGestureResponse(gesture, data);
 	}
 }
