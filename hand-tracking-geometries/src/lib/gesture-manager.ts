@@ -136,9 +136,22 @@ class GestureHandler {
 		);
 	};
 
-	storePinchData(): void {}
+	private getCurrentPinchFingersCoords(fingerDistances: FingerDistance[]): {
+		currentPinchX: number;
+		currentPinchY: number;
+	} {
+		const thumbTip = fingerDistances[0]?.fingerTip;
+		const indexTip = fingerDistances[1]?.fingerTip;
 
-	handleSinglehandPinch({
+		const currentPinchX = (thumbTip.x + indexTip.x) / 2;
+		const currentPinchY = (thumbTip.y + indexTip.y) / 2;
+		return {
+			currentPinchX,
+			currentPinchY,
+		};
+	}
+
+	storePinchData({
 		fingerDistances,
 		normalizedThreeObjectCoords,
 		handLabel,
@@ -146,14 +159,10 @@ class GestureHandler {
 		fingerDistances: FingerDistance[];
 		normalizedThreeObjectCoords: NormalizedCoords;
 		handLabel: HandLabel;
-	}): GestureResponse {
-		const thumbTip = fingerDistances[0]?.fingerTip;
-		const indexTip = fingerDistances[1]?.fingerTip;
-
-		const currentPinchX = (thumbTip.x + indexTip.x) / 2;
-		const currentPinchY = (thumbTip.y + indexTip.y) / 2;
-
+	}): void {
 		const { objectX, objectY } = normalizedThreeObjectCoords;
+		const { currentPinchX, currentPinchY } =
+			this.getCurrentPinchFingersCoords(fingerDistances);
 
 		// need to check euclid distance from pinch to object center to check how far pinches are
 		// √[(x₂ - x₁)² + (y₂ - y₁)²] in case you need to see the formula too
@@ -172,7 +181,19 @@ class GestureHandler {
 					pinchDistanceToObject,
 			},
 		});
+	}
 
+	handleSinglehandPinch({
+		fingerDistances,
+		normalizedThreeObjectCoords,
+	}: {
+		fingerDistances: FingerDistance[];
+		normalizedThreeObjectCoords: NormalizedCoords;
+		handLabel: HandLabel;
+	}): GestureResponse {
+		const { currentPinchX } =
+			this.getCurrentPinchFingersCoords(fingerDistances);
+		const { objectX } = normalizedThreeObjectCoords;
 		// the tip coordinates are fliiped 1 - 0 left -> right because we reversed the webcam
 		const deltaX = -currentPinchX - objectX;
 
@@ -194,7 +215,6 @@ class GestureHandler {
 				rightHandData?.pinchDistanceToObject - rightHandData?.initialDistance;
 
 			const averagePinchChange = (leftPinchChange + rightPinchChange) / 2;
-			console.log(averagePinchChange, PINCH_ROTATION_THRESHOLD);
 
 			// need this abs check cause sometimes even when your fingers aren't moving
 			// it will still trigger a scale action
@@ -310,9 +330,13 @@ export class HandGestureManager {
 	private validateGestures({
 		fingerDistances,
 		indexToThumbDistance,
+		normalizedThreeObjectCoords,
+		handLabel,
 	}: {
 		fingerDistances: FingerDistance[];
 		indexToThumbDistance: number;
+		normalizedThreeObjectCoords: NormalizedCoords;
+		handLabel: HandLabel;
 	}): Partial<HandGestureType> | null {
 		const { validPinch, otherFingersPinched, makingFist } =
 			this.gestureHandler.checkGestureType(
@@ -321,6 +345,11 @@ export class HandGestureManager {
 			);
 
 		if (validPinch && !makingFist) {
+			this.gestureHandler.storePinchData({
+				fingerDistances,
+				normalizedThreeObjectCoords,
+				handLabel,
+			});
 			if (this.gestureHandler.bothHandsPinched()) {
 				return HandGestures.TWO_HAND_PINCHED;
 			}
@@ -358,6 +387,8 @@ export class HandGestureManager {
 		const gesture = this.validateGestures({
 			fingerDistances,
 			indexToThumbDistance,
+			normalizedThreeObjectCoords,
+			handLabel,
 		});
 
 		if (!gesture) return defaultGestureResponse;
