@@ -18,15 +18,29 @@ import type { GLTF } from "three/examples/jsm/Addons.js";
  *
  */
 
+// ===== constants ===== //
+const PINCH_DISTANCE_THRESHOLD = 0.08;
+const FIST_FINGER_DISTANCE_THRESHOLD = PINCH_DISTANCE_THRESHOLD - 0.02;
+// how
+const PINCH_DELTA_SCALE = 20;
+const PINCH_ROTATION_THRESHOLD = 0.02;
+
 type NormalizedCoords = {
 	objectX: number;
 	objectY: number;
 };
 
-class GestureHandler {
-	private readonly pinchDistanceThreshold = 0.08;
-	private readonly pinchRotationThreshold = 0.02;
+type Coords2D = {
+	x: number;
+	y: number;
+};
 
+// ==== utils ===== //
+const getEuclidianDistance = (a: Coords2D, b: Coords2D): number => {
+	return Math.hypot(a.x - b.x, a.y - b.y);
+};
+
+class GestureHandler {
 	private pinchedHands: Map<
 		string,
 		{
@@ -44,7 +58,7 @@ class GestureHandler {
 
 	private validPinchDistance(
 		distance: number,
-		distanceThreshold = this.pinchDistanceThreshold
+		distanceThreshold = PINCH_DISTANCE_THRESHOLD
 	): boolean {
 		return distance <= distanceThreshold;
 	}
@@ -52,7 +66,7 @@ class GestureHandler {
 	// checking if all non-thumb fingers are curled into a fist.
 	private allFingersMakingFist = (fingers: FingerDistance[]): boolean => {
 		return fingers.every(
-			(finger) => finger.distanceToBase < this.pinchDistanceThreshold - 0.02
+			(finger) => finger.distanceToBase < FIST_FINGER_DISTANCE_THRESHOLD
 		);
 	};
 
@@ -120,13 +134,11 @@ class GestureHandler {
 			// need this abs check cause sometimes even when your fingers aren't moving
 			// it will still trigger a scale action
 			// shaky camera / mediapipe tracking maybe
-			if (Math.abs(averagePinchChange) > this.pinchRotationThreshold) {
+			if (Math.abs(averagePinchChange) > PINCH_ROTATION_THRESHOLD) {
 				if (averagePinchChange > 0) {
-					console.log("scale up");
 					return { gesture: HandGestures.SCALE_UP };
 				}
 				if (averagePinchChange < 0) {
-					console.log("scale down");
 					return { gesture: HandGestures.SCALE_DOWN };
 				}
 			}
@@ -170,15 +182,6 @@ export class HandGestureManager {
 
 	gestureHandler = new GestureHandler();
 
-	private calculateTipDistances(
-		tipA: HandLandmark,
-		tipB: HandLandmark
-	): number {
-		const distanceX = tipA.x - tipB.x;
-		const distanceY = tipA.y - tipB.y;
-		return Math.hypot(distanceX, distanceY);
-	}
-
 	// Converts threejs coordinates into normalized mediapipe coords
 	private getNormalizedObjectPosition(
 		threeObject: GLTF,
@@ -205,22 +208,19 @@ export class HandGestureManager {
 		tips: HandLandmark[];
 		position: NormalizedCoords;
 	}): boolean => {
-		let allTipsAboveObject = true;
-		const { objectX, objectY } = position;
+		const objectPosition = {
+			x: position.objectX,
+			y: position.objectY,
+		};
 
-		tips.forEach((tip) => {
-			const dx = objectX - (1 - tip.x);
-			const dy = objectY - tip.y;
-			const distance = Math.sqrt(dx * dx + dy * dy);
+		return tips.every((tip) => {
+			const distance = getEuclidianDistance(tip, objectPosition);
 
 			// this distance to be a "zone" of where the object is
 			// but it's ok for now
 			// todo - get actual model scale zone
-			if (distance > 0.4) {
-				allTipsAboveObject = false;
-			}
+			return distance < 0.2;
 		});
-		return allTipsAboveObject;
 	};
 
 	private calculateDistancesBetweenFingers = (
@@ -237,14 +237,15 @@ export class HandGestureManager {
 		const fingerDistances = fingers.map(({ fingerTip, fingerBase }) => {
 			return {
 				fingerTip,
-				distanceToThumb: this.calculateTipDistances(thumbTip, fingerTip),
-				distanceToBase: this.calculateTipDistances(fingerTip, fingerBase),
+				distanceToThumb: getEuclidianDistance(thumbTip, fingerTip),
+				distanceToBase: getEuclidianDistance(fingerTip, fingerBase),
 			};
 		});
 
 		return fingerDistances;
 	};
 
+	// todo, break this up
 	private validateGestures({
 		handLabel,
 		fingerDistances,
@@ -281,12 +282,25 @@ export class HandGestureManager {
 
 			// the tip coordinates are fliiped 1 - 0 left -> right because we reversed the webcam
 			const deltaX = -currentPinchX - objectX;
-			return { gesture: HandGestures.PINCHED, data: deltaX / 20 };
+
+			return {
+				gesture: HandGestures.PINCHED,
+				data: deltaX / PINCH_DELTA_SCALE,
+			};
 		}
 
 		this.gestureHandler.resetPinchedHands();
 		if (otherFingersPinched) return { gesture: HandGestures.SQUEEZED };
-		if (makingFist) return { gesture: HandGestures.FIST };
+		if (makingFist) {
+			const isHandHoveringOverObject = this.isHandHoveringAboveObject({
+				tips: fingerDistances.map((finger) => finger.fingerTip),
+				position: threeObjectPosition,
+			});
+
+			if (isHandHoveringOverObject) {
+				return { gesture: HandGestures.FIST };
+			}
+		}
 
 		return gestureResponse;
 	}
@@ -304,20 +318,12 @@ export class HandGestureManager {
 	}): GestureResponse {
 		const fingerDistances = this.calculateDistancesBetweenFingers(hand);
 
-		const { fingerTip: indexTip, distanceToThumb: indexToThumbDistance } =
-			fingerDistances[1];
+		const { distanceToThumb: indexToThumbDistance } = fingerDistances[1];
 
 		const normalizedThreeObjectCoords = this.getNormalizedObjectPosition(
 			threeObject,
 			camera
 		);
-
-		const isHandHoveringOverObject = this.isHandHoveringAboveObject({
-			tips: [indexTip],
-			position: normalizedThreeObjectCoords,
-		});
-
-		if (!isHandHoveringOverObject) return { gesture: "" };
 
 		return this.validateGestures({
 			handLabel,
