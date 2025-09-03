@@ -4,6 +4,7 @@ export const objectScaleTick = 0.025;
 export const HandGestures = Object.freeze({
 	// pinched scale down or up
 	PINCHED: "pinched",
+	TWO_HAND_PINCHED: "two_hand_pinched",
 
 	UNPINCH: "unpinched",
 	// drag / drop
