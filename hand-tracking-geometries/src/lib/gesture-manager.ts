@@ -25,6 +25,10 @@ const FIST_FINGER_DISTANCE_THRESHOLD = PINCH_DISTANCE_THRESHOLD - 0.02;
 const PINCH_DELTA_SCALE = 20; // how fast to spin the model when pinched
 const PINCH_ROTATION_THRESHOLD = 0.02;
 
+// the indices of where mediapipe flags as tips or base / start of finger
+const fingerTipsIndices = [4, 8, 12, 16, 20];
+const fingerBasesIndices = [0, 5, 9, 13, 17];
+
 const defaultGestureResponse: GestureResponse = {
 	gesture: "",
 	data: null,
@@ -52,7 +56,7 @@ type PinchedHands = Map<
 		};
 	}
 >;
-// ===== end constant ===== //
+// ===== end constants ===== //
 
 // ==== utils ===== //
 const getEuclidianDistance = (a: Coords2D, b: Coords2D): number => {
@@ -141,7 +145,7 @@ class GestureHandler {
 	}): GestureResponse {
 		const { currentPinchX } = this.calculatePinchCenter(fingerDistances);
 		const { x: objectX } = normalizedThreeObjectCoords;
-		// the tip coordinates are fliiped 1 - 0 left -> right because we reversed the webcam
+		// the tip coordinates are flipped 1 - 0 left -> right because we reversed / mirrored the webcam
 		const deltaX = -currentPinchX - objectX;
 
 		return {
@@ -221,15 +225,14 @@ class GestureHandler {
 	}
 }
 
-export class HandGestureManager {
-	// the indices of where mediapipe flags as tips or base / start of finger
-	private readonly fingerTipsIndices = [4, 8, 12, 16, 20];
-	private readonly fingerBasesIndices = [0, 5, 9, 13, 17];
+export class HandGestureManager extends GestureHandler {
 	private vector3d = new three.Vector3();
 
 	gestureHandler = new GestureHandler();
 
-	// Converts threejs coordinates into normalized mediapipe coords
+	/**
+	 * Converts threejs coordinates into normalized mediapipe coords
+	 */
 	private getNormalizedObjectPosition(
 		threeObject: GLTF,
 		camera: three.PerspectiveCamera
@@ -251,14 +254,13 @@ export class HandGestureManager {
 	private calculateDistancesBetweenFingers = (
 		hand: HandLandmark[]
 	): FingerDistance[] => {
-		const fingers = this.fingerTipsIndices.map((tip, index) => ({
+		const fingers = fingerTipsIndices.map((tip, index) => ({
 			fingerTip: hand[tip],
-			fingerBase: hand[this.fingerBasesIndices[index]],
+			fingerBase: hand[fingerBasesIndices[index]],
 		}));
 
 		const thumbTip = fingers[0].fingerTip;
 
-		// remove thumb from result cause we only care about calculated distance from thumb or other bases
 		const fingerDistances = fingers.map(({ fingerTip, fingerBase }) => {
 			return {
 				fingerTip,
@@ -270,7 +272,6 @@ export class HandGestureManager {
 		return fingerDistances;
 	};
 
-	// todo, break this up
 	private validateGestures({
 		fingerDistances,
 		indexToThumbDistance,
