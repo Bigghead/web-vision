@@ -185,7 +185,6 @@ export class ThreeCanvas {
 
 		this.scene.background = new three.Color("#ccd5c4");
 
-		// Add event listeners (important for functionality)
 		window.addEventListener("resize", this.resizeCanvas);
 		window.addEventListener("scroll", this.handleScroll);
 		window.addEventListener("mousemove", this.handleMouseMove);

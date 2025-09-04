@@ -112,7 +112,10 @@ const handleModelScale = (
 	model.scene.scale.z += scale;
 };
 
-const handleHandGesture = (hand: HandLandmark[], handLabel: HandLabel) => {
+const handleHandGesture = (
+	hand: HandLandmark[],
+	handLabel: HandLabel
+): void => {
 	const models = threeObject;
 	if (!models.length) return;
 
@@ -125,8 +128,7 @@ const handleHandGesture = (hand: HandLandmark[], handLabel: HandLabel) => {
 
 		switch (gesture) {
 			case HandGestures.FIST:
-				makeObjectFollowHand(model, hand);
-				return;
+				return makeObjectFollowHand(model, hand);
 			case HandGestures.SQUEEZED:
 				return;
 			case HandGestures.PINCHED:
@@ -136,8 +138,7 @@ const handleHandGesture = (hand: HandLandmark[], handLabel: HandLabel) => {
 				return;
 			case HandGestures.SCALE_UP:
 			case HandGestures.SCALE_DOWN:
-				handleModelScale(gesture, model);
-				return;
+				return handleModelScale(gesture, model);
 			default:
 				return;
 		}
