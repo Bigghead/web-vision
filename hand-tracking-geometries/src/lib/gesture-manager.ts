@@ -225,9 +225,8 @@ class GestureHandler {
 	}
 }
 
-export class HandGestureManager extends GestureHandler {
+export class HandGestureManager {
 	private vector3d = new three.Vector3();
-
 	gestureHandler = new GestureHandler();
 
 	/**
